@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: civic_lantern_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: civic_lantern_user
+      POSTGRES_PASSWORD: devpassword123
+      POSTGRES_DB: civic_lantern_dev
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.utf8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U civic_lantern_user -d civic_lantern_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  # Implicit. Written for clarity.
+    driver: local
