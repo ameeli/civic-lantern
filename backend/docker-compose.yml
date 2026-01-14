@@ -10,6 +10,7 @@ services:
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.utf8"
     ports:
       - "5432:5432"
+    # docker volumn created to persist data outside the container lifecycle
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
