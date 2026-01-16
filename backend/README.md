@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Civic Lantern is a tool for tracking campaign contributions, independent expenditures, and election data. This project provides a FastAPI backend with a PostgreSQL database. Users can explore candidate funding, top supporters, and election totals.
+The Civic Lantern is a tool for tracking campaign contributions, independent expenditures, and election data. This project pairs a FastAPI backend with a PostgreSQL database. Users can explore candidate funding, top supporters, and election totals.
 
 ## Tech Stack
 

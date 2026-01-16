@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
@@ -16,8 +17,8 @@ class Settings(BaseSettings):
     FEC_API_KEY: str | None = None
 
     class Config:
-        env_file = ".env"
-        case_sensitive = True
+        env_file = Path(__file__).resolve().parents[2] / ".env"
+        env_file_encoding = "utf-8"
 
 
 @lru_cache()
