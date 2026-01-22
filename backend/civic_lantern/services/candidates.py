@@ -7,13 +7,9 @@ async def ingest_candidates(cycle: int = 2024):
     """Import candidates from FEC API."""
     client = FECClient()
 
-    try:
-        fec_results = await client.get_candidates(cycle=cycle)
-        print(f"Retrieved {len(fec_results)} candidates")
-        print(fec_results[len(fec_results) // 2])
-
-    finally:
-        await client.close()
+    candidates = await client.get_candidates(cycle=cycle)
+    print(f"Retrieved {len(candidates)} candidates")
+    print(candidates[len(candidates) // 2])
 
 
 if __name__ == "__main__":

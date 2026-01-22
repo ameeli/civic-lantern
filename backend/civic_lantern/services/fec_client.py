@@ -35,13 +35,19 @@ class FECClient:
             pagination = data.get("pagination", {})
             print(pagination)
 
-            if page >= 5:
+            if page >= 3:
                 break
             # if page >= pagination.get("pages", 0):
             #     break
             page += 1
 
         return all_results
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     async def close(self):
         await self.client.aclose()
