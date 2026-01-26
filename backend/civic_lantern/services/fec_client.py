@@ -1,10 +1,17 @@
-# civic_lantern/services/fec_client.py
 import logging
 
 import httpx
 from aiolimiter import AsyncLimiter
 
 from civic_lantern.core.config import get_settings
+from civic_lantern.services.fec_exceptions import (
+    FECAPIError,
+    FECAuthenticationError,
+    FECNotFoundError,
+    FECRateLimitError,
+    FECTimeoutError,
+    FECValidationError,
+)
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -15,6 +22,7 @@ class FECClient:
         self.base_url = "https://api.open.fec.gov/v1"
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
+        # todo: double check FEC limit and stay under
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
 
     async def _fetch_page(self, url: str, params: dict) -> dict:
@@ -24,17 +32,40 @@ class FECClient:
                 response = await self.client.get(url, params=params)
                 response.raise_for_status()
                 return response.json()
-            except httpx.HTTPError as e:
-                # todo: add custom exception classes
-                logger.error(f"❌ HTTP error: {e}")
-                raise
+            except httpx.httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+
+                if status_code == 429:
+                    raise FECRateLimitError(
+                        "Rate limit exceeded despite limiter. "
+                        "Check limiter configuration."
+                    ) from e
+
+                elif status_code == 404:
+                    raise FECNotFoundError(f"Resource not found: {url}") from e
+
+                elif status_code == 400:
+                    raise FECValidationError(f"Invalid parameters: {params}") from e
+
+                elif status_code in (401, 403):
+                    raise FECAuthenticationError("Invalid or missing API key") from e
+
+                else:
+                    raise FECAPIError(f"HTTP {status_code} error: {e}") from e
+
+            except httpx.TimeoutException as e:
+                raise FECTimeoutError(f"Request timeout after 30 seconds: {url}") from e
+
+            except httpx.RequestError as e:
+                raise FECAPIError(f"Request failed: {e}") from e
 
     async def _paginate(
-        # todo: max_pages = 100, temp 3 for manual testing
         self,
         url: str,
         base_params: dict,
+        # todo: remove line after manual testing
         max_pages: int = 3,
+        # max_pages: int | None = None
     ) -> list[dict]:
         """
         Generic pagination handler for any FEC endpoint.
@@ -49,8 +80,11 @@ class FECClient:
         all_results = []
         page = 1
 
-        while page <= max_pages:
-            logger.info(f"Fetching page {page}")
+        while True:
+            if max_pages and page >= max_pages:
+                break
+
+            logger.info("Fetching page", extra={"page": page, "endpoint": url})
 
             params = {**base_params, "page": page}
             data = await self._fetch_page(url, params)
@@ -62,9 +96,9 @@ class FECClient:
             all_results.extend(results)
 
             pagination = data.get("pagination", {})
-            total_pages = pagination.get("pages", 0)
+            total_pages = pagination.get("pages")
 
-            if page >= total_pages:
+            if total_pages is not None and page >= total_pages:
                 break
 
             page += 1
