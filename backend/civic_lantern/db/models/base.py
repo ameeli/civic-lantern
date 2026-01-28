@@ -1,5 +1,7 @@
 from sqlalchemy.orm import declarative_base
 
+# NOTE: When adding a new model, remember to add the table name to the trigger list
+# in the migration file.
 Base = declarative_base()
 
 
