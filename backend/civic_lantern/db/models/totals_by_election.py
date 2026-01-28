@@ -1,9 +1,10 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, Numeric, func
+from sqlalchemy import Column, ForeignKey, Index, Integer, Numeric
 
 from civic_lantern.db.models.base import Base
+from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class TotalsByElection(Base):
+class TotalsByElection(Base, TimestampMixin):
     __tablename__ = "totals_by_election"
     __table_args__ = (Index("idx_totals_by_election_election_id", "election_id"),)
 
@@ -15,14 +16,3 @@ class TotalsByElection(Base):
         Numeric(14, 2), nullable=False, server_default="0"
     )
     receipts = Column(Numeric(14, 2), nullable=False, server_default="0")
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )

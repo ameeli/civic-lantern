@@ -8,15 +8,15 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
-    func,
 )
 from sqlalchemy import Enum as SQLEnum
 
 from civic_lantern.db.models.base import Base, enum_values_callable
 from civic_lantern.db.models.enums import OfficeTypeEnum
+from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class Candidate(Base):
+class Candidate(Base, TimestampMixin):
     __tablename__ = "candidates"
     __table_args__ = (
         Index("idx_candidates_state_office", "state", "office"),
@@ -57,14 +57,3 @@ class Candidate(Base):
     last_f2_date = Column(Date)
     last_file_date = Column(Date)
     load_date = Column(DateTime(timezone=True))
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )

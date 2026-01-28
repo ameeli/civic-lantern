@@ -1,11 +1,12 @@
-from sqlalchemy import CHAR, Column, DateTime, Integer, UniqueConstraint, func
+from sqlalchemy import CHAR, Column, Integer, UniqueConstraint
 from sqlalchemy import Enum as SQLEnum
 
 from civic_lantern.db.models.base import Base, enum_values_callable
 from civic_lantern.db.models.enums import OfficeTypeEnum
+from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class Election(Base):
+class Election(Base, TimestampMixin):
     __tablename__ = "elections"
     __table_args__ = (UniqueConstraint("cycle", "office", "state", "district"),)
 
@@ -21,14 +22,3 @@ class Election(Base):
     )
     state = Column(CHAR(2), nullable=False)
     district = Column(CHAR(2))
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )

@@ -1,11 +1,12 @@
-from sqlalchemy import ARRAY, CHAR, Column, Date, DateTime, Integer, String, func
+from sqlalchemy import ARRAY, CHAR, Column, Date, Integer, String
 from sqlalchemy import Enum as SQLEnum
 
 from civic_lantern.db.models.base import Base, enum_values_callable
 from civic_lantern.db.models.enums import CommitteeTypeEnum
+from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class Committee(Base):
+class Committee(Base, TimestampMixin):
     __tablename__ = "committees"
 
     committee_id = Column(String, primary_key=True, nullable=False)
@@ -45,14 +46,3 @@ class Committee(Base):
 
     state = Column(CHAR(2))
     treasurer_name = Column(String)
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )

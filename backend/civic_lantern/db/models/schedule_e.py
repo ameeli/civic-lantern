@@ -2,21 +2,20 @@ from sqlalchemy import (
     BigInteger,
     Column,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
     Numeric,
     String,
-    func,
 )
 from sqlalchemy import Enum as SQLEnum
 
 from civic_lantern.db.models.base import Base, enum_values_callable
 from civic_lantern.db.models.enums import SupportOpposeEnum
+from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class ScheduleE(Base):
+class ScheduleE(Base, TimestampMixin):
     __tablename__ = "schedule_e"
     __table_args__ = (
         Index("idx_schedule_e_candidate_id", "candidate_id"),
@@ -49,14 +48,3 @@ class ScheduleE(Base):
 
     payee_name = Column(String)
     expenditure_description = Column(String)
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
