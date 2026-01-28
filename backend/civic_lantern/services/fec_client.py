@@ -32,7 +32,7 @@ class FECClient:
                 response = await self.client.get(url, params=params)
                 response.raise_for_status()
                 return response.json()
-            except httpx.httpx.HTTPStatusError as e:
+            except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
 
                 if status_code == 429:
@@ -64,8 +64,8 @@ class FECClient:
         url: str,
         base_params: dict,
         # todo: remove line after manual testing
-        max_pages: int = 3,
-        # max_pages: int | None = None
+        # max_pages: int = 3,
+        max_pages: int | None = None,
     ) -> list[dict]:
         """
         Generic pagination handler for any FEC endpoint.
@@ -105,14 +105,14 @@ class FECClient:
 
         return all_results
 
-    async def get_candidates(self, cycle, per_page: int = 100) -> list[dict]:
+    async def get_candidates(self, per_page: int = 100, **kwargs) -> list[dict]:
         """Fetch candidates for a cycle."""
         url = f"{self.base_url}/candidates/"
         params = {
             "api_key": self.api_key,
-            "election_year": cycle,
             "per_page": per_page,
         }
+        params.update(kwargs)
 
         candidates = await self._paginate(url, params)
         logger.info(f"✅ Fetched {len(candidates)} candidates")
