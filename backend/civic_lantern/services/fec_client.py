@@ -12,6 +12,7 @@ from civic_lantern.services.fec_exceptions import (
     FECTimeoutError,
     FECValidationError,
 )
+from civic_lantern.services.http_utils import fec_retry
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -22,9 +23,9 @@ class FECClient:
         self.base_url = "https://api.open.fec.gov/v1"
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
-        # todo: double check FEC limit and stay under
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
 
+    @fec_retry
     async def _fetch_page(self, url: str, params: dict) -> dict:
         """Fetch a single page from the API."""
         async with self.limiter:
@@ -63,8 +64,6 @@ class FECClient:
         self,
         url: str,
         base_params: dict,
-        # todo: remove line after manual testing
-        # max_pages: int = 3,
         max_pages: int | None = None,
     ) -> list[dict]:
         """
