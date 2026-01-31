@@ -56,4 +56,4 @@ async def ingest_candidates(
 
 
 if __name__ == "__main__":
-    asyncio.run(ingest_candidates(start_date="2024-01-10", end_date="2024-01-31"))
+    asyncio.run(ingest_candidates(start_date="2024-03-01", end_date="2024-08-01"))
