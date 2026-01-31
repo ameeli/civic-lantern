@@ -10,8 +10,11 @@ from civic_lantern.core.config import get_settings
 from civic_lantern.services.fec_exceptions import (
     FECAPIError,
     FECAuthenticationError,
+    FECNetworkError,
     FECNotFoundError,
+    FECProtocolError,
     FECRateLimitError,
+    FECServerError,
     FECTimeoutError,
     FECValidationError,
 )
@@ -35,32 +38,48 @@ class FECClient:
                 response = await self.client.get(url, params=params)
                 response.raise_for_status()
                 return response.json()
+
             except httpx.HTTPStatusError as e:
-                status_code = e.response.status_code
-
-                if status_code == 429:
-                    raise FECRateLimitError(
-                        "Rate limit exceeded despite limiter. "
-                        "Check limiter configuration."
-                    ) from e
-
-                elif status_code == 404:
-                    raise FECNotFoundError(f"Resource not found: {url}") from e
-
-                elif status_code == 400:
-                    raise FECValidationError(f"Invalid parameters: {params}") from e
-
-                elif status_code in (401, 403):
-                    raise FECAuthenticationError("Invalid or missing API key") from e
-
-                else:
-                    raise FECAPIError(f"HTTP {status_code} error: {e}") from e
+                self._raise_fec_error(e, url=url, params=params)
 
             except httpx.TimeoutException as e:
                 raise FECTimeoutError(f"Request timeout after 30 seconds: {url}") from e
 
+            except httpx.NetworkError as e:
+                raise FECNetworkError("Network connectivity failed") from e
+
+            except httpx.ProtocolError as e:
+                raise FECProtocolError(f"Protocol error: {e}") from e
+
             except httpx.RequestError as e:
                 raise FECAPIError(f"Request failed: {e}") from e
+
+    def _raise_fec_error(self, e: httpx.HTTPStatusError, *, url: str, params: dict):
+        response = e.response
+        status = response.status_code
+
+        if status == 429:
+            raise FECRateLimitError("Rate limit exceeded", status_code=status) from e
+        elif status == 404:
+            raise FECNotFoundError(
+                f"Resource not found: {url}", status_code=status, response=response
+            ) from e
+        elif status == 400:
+            raise FECValidationError(
+                f"Invalid parameters: {params}", status_code=status, response=response
+            ) from e
+        elif status in (401, 403):
+            raise FECAuthenticationError(
+                "Invalid or missing API key", status_code=status, response=response
+            ) from e
+        elif status >= 500:
+            raise FECServerError(
+                f"Server error {status}", status_code=status, response=response
+            ) from e
+        else:
+            raise FECAPIError(
+                f"HTTP {status} error", status_code=status, response=response
+            ) from e
 
     async def _paginate(
         self, url: str, base_params: dict, max_pages: Optional[int] = None
