@@ -20,5 +20,5 @@ class Election(Base, TimestampMixin):
         ),
         nullable=False,
     )
-    state = Column(CHAR(2), nullable=False)
+    state = Column(CHAR(2))
     district = Column(CHAR(2))

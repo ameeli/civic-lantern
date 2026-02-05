@@ -32,13 +32,12 @@ class Candidate(Base, TimestampMixin):
             name="office_enum",
             values_callable=enum_values_callable,
         ),
-        nullable=False,
     )
 
     party = Column(String)
     party_full = Column(String)
 
-    state = Column(CHAR(2), nullable=False)
+    state = Column(CHAR(2))
     district = Column(CHAR(2))
 
     incumbent_challenge = Column(CHAR(1))

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
     DB_NAME: str
     DATABASE_URL_ASYNC: str
+    TEST_DATABASE_URL_ASYNC: str
     FEC_API_KEY: str | None = None
 
     class Config:
