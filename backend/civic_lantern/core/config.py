@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -17,9 +18,11 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL_ASYNC: str
     FEC_API_KEY: str | None = None
 
-    class Config:
-        env_file = Path(__file__).resolve().parents[2] / ".env"
-        env_file_encoding = "utf-8"
+    model_config = ConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 @lru_cache()
