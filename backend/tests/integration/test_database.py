@@ -133,3 +133,23 @@ class TestCandidateUpsert:
 
         assert await service.get_by_id("C_NEW_1") is not None
         assert await service.get_by_id("C_NEW_2") is not None
+
+    async def test_invalid_data_triggers_row_by_row_fallback(self, async_db):
+        """Invalid record in batch should trigger fallback and track errors."""
+        service = CandidateService(db=async_db)
+
+        batch = [
+            {"candidate_id": "C_VALID_1", "name": "Valid One"},
+            {"candidate_id": "C_INVALID"},
+            {"candidate_id": "C_VALID_2", "name": "Valid Two"},
+        ]
+
+        stats = await service.upsert_batch(batch)
+
+        assert stats["upserted"] == 2
+        assert stats["errors"] == 1
+        assert "C_INVALID" in stats["failed_ids"]
+
+        assert await service.get_by_id("C_VALID_1") is not None
+        assert await service.get_by_id("C_VALID_2") is not None
+        assert await service.get_by_id("C_INVALID") is None
