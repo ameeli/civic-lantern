@@ -153,3 +153,25 @@ class TestCandidateUpsert:
         assert await service.get_by_id("C_VALID_1") is not None
         assert await service.get_by_id("C_VALID_2") is not None
         assert await service.get_by_id("C_INVALID") is None
+
+    async def test_duplicate_ids_in_same_batch(self, async_db):
+        """Multiple records with same ID in one batch - last one wins."""
+        service = CandidateService(db=async_db)
+
+        batch = [
+            CandidateIn(candidate_id="C_DUP", name="First"),
+            CandidateIn(candidate_id="C_DUP", name="Second"),
+            CandidateIn(candidate_id="C_DUP", name="Third"),
+        ]
+
+        stats = await service.upsert_batch(batch)
+        assert stats["upserted"] == 3
+
+        retrieved = await service.get_by_id("C_DUP")
+        assert retrieved.name == "Third"
+
+        result = await async_db.execute(
+            select(service.model).where(service.model.candidate_id == "C_DUP")
+        )
+        all_dups = result.scalars().all()
+        assert len(all_dups) == 1
