@@ -9,7 +9,7 @@ from civic_lantern.db.models import Base
 async def async_db():
     settings = get_settings()
 
-    engine = create_async_engine(settings.TEST_DATABASE_URL_ASYNC, echo=True)
+    engine = create_async_engine(settings.TEST_DATABASE_URL_ASYNC, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

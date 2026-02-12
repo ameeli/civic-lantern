@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from sqlalchemy import select
 
@@ -7,10 +9,7 @@ from civic_lantern.services.data.candidate import CandidateService
 
 @pytest.mark.asyncio
 class TestCandidateUpsert:
-    """Test database upsert logic."""
-
     async def test_insert_new_candidate(self, async_db):
-        """New candidate should be inserted."""
         service = CandidateService(db=async_db)
 
         candidates = [CandidateIn(candidate_id="C001", name="Test Candidate")]
@@ -23,8 +22,16 @@ class TestCandidateUpsert:
         retrieved = await service.get_by_id("C001")
         assert retrieved.name == "Test Candidate"
 
+    async def test_upsert_empty_list(self, async_db):
+        service = CandidateService(db=async_db)
+
+        stats = await service.upsert_batch([])
+
+        assert stats["upserted"] == 0
+        assert stats["errors"] == 0
+        assert stats["failed_ids"] == []
+
     async def test_update_existing_candidate(self, async_db):
-        """Existing candidate should be updated, not duplicated."""
         service = CandidateService(db=async_db)
 
         c1 = CandidateIn(candidate_id="C001", name="Original Name", party="DEM")
@@ -38,7 +45,6 @@ class TestCandidateUpsert:
         assert retrieved.party == "REP"
 
     async def test_created_at_is_immutable(self, async_db):
-        """Updating a record should NOT change its created_at timestamp."""
         service = CandidateService(db=async_db)
 
         c1 = CandidateIn(candidate_id="C_TIME", name="Original")
@@ -56,6 +62,24 @@ class TestCandidateUpsert:
 
         assert updated_record.name == "Updated"
         assert updated_record.created_at == original_ts
+
+    async def test_updated_at_changes_on_update(self, async_db):
+        """updated_at timestamp should change when record is updated."""
+        service = CandidateService(db=async_db)
+
+        c1 = CandidateIn(candidate_id="C_UPDATE_TIME", name="Original")
+        await service.upsert_batch([c1])
+        original = await service.get_by_id("C_UPDATE_TIME")
+        original_updated_at = original.updated_at
+
+        async_db.expire_all()
+        await asyncio.sleep(0.1)
+
+        c2 = CandidateIn(candidate_id="C_UPDATE_TIME", name="Updated")
+        await service.upsert_batch([c2])
+        updated = await service.get_by_id("C_UPDATE_TIME")
+
+        assert updated.updated_at > original_updated_at
 
     async def test_batch_pagination_logic(self, async_db):
         """Ensure data is processed correctly even when split across batches."""
