@@ -10,6 +10,7 @@ from civic_lantern.services.data.candidate import CandidateService
 @pytest.mark.asyncio
 class TestCandidateUpsert:
     async def test_insert_new_candidate(self, async_db):
+        """Test that basic insert is successful."""
         service = CandidateService(db=async_db)
 
         candidates = [CandidateIn(candidate_id="C001", name="Test Candidate")]
@@ -23,6 +24,7 @@ class TestCandidateUpsert:
         assert retrieved.name == "Test Candidate"
 
     async def test_upsert_empty_list(self, async_db):
+        """Empty input should resolve without error."""
         service = CandidateService(db=async_db)
 
         stats = await service.upsert_batch([])
@@ -32,6 +34,7 @@ class TestCandidateUpsert:
         assert stats["failed_ids"] == []
 
     async def test_update_existing_candidate(self, async_db):
+        "Existing candidates are successfully updated."
         service = CandidateService(db=async_db)
 
         c1 = CandidateIn(candidate_id="C001", name="Original Name", party="DEM")
@@ -45,14 +48,15 @@ class TestCandidateUpsert:
         assert retrieved.party == "REP"
 
     async def test_created_at_is_immutable(self, async_db):
+        """Updating an existing record should not change created_at."""
         service = CandidateService(db=async_db)
 
         c1 = CandidateIn(candidate_id="C_TIME", name="Original")
         await service.upsert_batch([c1])
-        original_record = await service.get_by_id("C_TIME")
-        original_ts = original_record.created_at
+        original = await service.get_by_id("C_TIME")
+        original_ts = original.created_at
 
-        async_db.expire(original_record)
+        async_db.expire(original)
 
         c2 = CandidateIn(candidate_id="C_TIME", name="Updated")
         await service.upsert_batch([c2])
@@ -64,7 +68,7 @@ class TestCandidateUpsert:
         assert updated_record.created_at == original_ts
 
     async def test_updated_at_changes_on_update(self, async_db):
-        """updated_at timestamp should change when record is updated."""
+        """Verify that the PostgreSQL trigger refreshes updated_at on upsert."""
         service = CandidateService(db=async_db)
 
         c1 = CandidateIn(candidate_id="C_UPDATE_TIME", name="Original")
@@ -72,7 +76,7 @@ class TestCandidateUpsert:
         original = await service.get_by_id("C_UPDATE_TIME")
         original_updated_at = original.updated_at
 
-        async_db.expire_all()
+        async_db.expire(original)
         await asyncio.sleep(0.1)
 
         c2 = CandidateIn(candidate_id="C_UPDATE_TIME", name="Updated")
@@ -105,3 +109,27 @@ class TestCandidateUpsert:
 
         batch_0 = next(c for c in saved_candidates if c.candidate_id == "C_BATCH_0")
         assert batch_0.name == "Name 0"
+
+    async def test_mixed_insert_and_update_in_same_batch(self, async_db):
+        """Batch with both new and existing records should handle correctly."""
+        service = CandidateService(db=async_db)
+
+        existing = CandidateIn(candidate_id="C_EXIST", name="Existing")
+        await service.upsert_batch([existing])
+
+        mixed_batch = [
+            CandidateIn(candidate_id="C_EXIST", name="Updated Existing"),
+            CandidateIn(candidate_id="C_NEW_1", name="New One"),
+            CandidateIn(candidate_id="C_NEW_2", name="New Two"),
+        ]
+
+        stats = await service.upsert_batch(mixed_batch)
+
+        assert stats["upserted"] == 3
+        assert stats["errors"] == 0
+
+        updated = await service.get_by_id("C_EXIST")
+        assert updated.name == "Updated Existing"
+
+        assert await service.get_by_id("C_NEW_1") is not None
+        assert await service.get_by_id("C_NEW_2") is not None
