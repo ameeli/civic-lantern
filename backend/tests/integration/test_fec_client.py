@@ -70,21 +70,20 @@ class TestFECClientErrorHandling:
     @respx.mock
     async def test_fetch_retries_on_500_error(self):
         """Client should retry 5xx errors."""
-        url = "https://api.open.fec.gov/v1/candidates/"
-        route = respx.get(url=url)
-
-        route.side_effect = [
-            httpx.Response(500, json={"error": "Server error"}),
-            httpx.Response(
-                200,
-                json={
-                    "results": [{"candidate_id": "C001", "name": "Test"}],
-                    "pagination": {"pages": 1},
-                },
-            ),
-        ]
-
         async with FECClient() as client:
+            route = respx.get(url__startswith=client.candidate_url).mock(
+                side_effect=[
+                    httpx.Response(500, json={"error": "Server error"}),
+                    httpx.Response(
+                        200,
+                        json={
+                            "results": [{"candidate_id": "C001", "name": "Test"}],
+                            "pagination": {"pages": 1},
+                        },
+                    ),
+                ]
+            )
+
             results = await client.get_candidates(election_year=2024)
 
         assert len(route.calls) == 2

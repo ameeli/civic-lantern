@@ -25,8 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class FECClient:
+    BASE_URL = "https://api.open.fec.gov/v1"
+
     def __init__(self):
-        self.base_url = "https://api.open.fec.gov/v1"
+        self.base_url = self.BASE_URL
+        self.candidate_url = f"{self.base_url}/candidates/"
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
@@ -119,14 +122,13 @@ class FECClient:
         return results
 
     async def get_candidates(self, per_page: int = 100, **kwargs) -> list[dict]:
-        url = f"{self.base_url}/candidates/"
         params = {
             "api_key": self.api_key,
             "per_page": per_page,
         }
         params.update(kwargs)
 
-        candidates = await self._paginate(url, params)
+        candidates = await self._paginate(self.candidate_url, params)
         logger.info(f"✅ Fetched {len(candidates)} candidates")
         return candidates
 
