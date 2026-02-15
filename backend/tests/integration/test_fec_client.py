@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 import httpx
 import pytest
+import respx
 
 from civic_lantern.services.fec_client import FECClient
 from civic_lantern.services.fec_exceptions import (
@@ -14,22 +15,6 @@ from civic_lantern.services.fec_exceptions import (
 @pytest.mark.asyncio
 class TestFECClientErrorHandling:
     """Test that HTTP errors map to correct exceptions."""
-
-    @pytest.mark.integration
-    @patch("civic_lantern.services.fec_client.httpx.AsyncClient.get")
-    async def test_get_candidates_raises_rate_limit_error(self, mock_get):
-        """Public method should bubble up the correct custom exception."""
-        client = FECClient()
-
-        mock_response = Mock()
-        mock_response.status_code = 429
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Too Many Requests", request=Mock(), response=mock_response
-        )
-        mock_get.return_value = mock_response
-
-        with pytest.raises(FECRateLimitError):
-            await client.get_candidates(election_year=2024)
 
     @pytest.mark.integration
     async def test_404_raises_not_found_error(self):
@@ -64,3 +49,43 @@ class TestFECClientErrorHandling:
             client._raise_fec_error(error, url="test", params={})
 
         assert exc_info.value.retryable is True
+
+    @pytest.mark.integration
+    @patch("civic_lantern.services.fec_client.httpx.AsyncClient.get")
+    async def test_get_candidates_raises_rate_limit_error(self, mock_get):
+        """Public method should bubble up the correct custom exception."""
+        client = FECClient()
+
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Too Many Requests", request=Mock(), response=mock_response
+        )
+        mock_get.return_value = mock_response
+
+        with pytest.raises(FECRateLimitError):
+            await client.get_candidates(election_year=2024)
+
+    @pytest.mark.integration
+    @respx.mock
+    async def test_fetch_retries_on_500_error(self):
+        """Client should retry 5xx errors."""
+        url = "https://api.open.fec.gov/v1/candidates/"
+        route = respx.get(url=url)
+
+        route.side_effect = [
+            httpx.Response(500, json={"error": "Server error"}),
+            httpx.Response(
+                200,
+                json={
+                    "results": [{"candidate_id": "C001", "name": "Test"}],
+                    "pagination": {"pages": 1},
+                },
+            ),
+        ]
+
+        async with FECClient() as client:
+            results = await client.get_candidates(election_year=2024)
+
+        assert len(route.calls) == 2
+        assert len(results) == 1
