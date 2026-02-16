@@ -7,6 +7,7 @@ from civic_lantern.schemas.candidate import CandidateIn
 from civic_lantern.services.data.candidate import CandidateService
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 class TestCandidateUpsert:
     async def test_insert_new_candidate(self, async_db):

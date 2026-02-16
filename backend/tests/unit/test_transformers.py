@@ -5,6 +5,7 @@ from civic_lantern.schemas.candidate import CandidateIn
 from civic_lantern.utils.transformers import transform_candidates
 
 
+@pytest.mark.unit
 class TestCandidateValidation:
     """Test Pydantic validation catches bad data."""
 
