@@ -12,11 +12,11 @@ from civic_lantern.services.fec_exceptions import (
 )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 class TestFECClientErrorHandling:
     """Test that HTTP errors map to correct exceptions."""
 
-    @pytest.mark.integration
     async def test_404_raises_not_found_error(self):
         """404 should raise FECNotFoundError (non-retryable)."""
         client = FECClient()
@@ -33,7 +33,6 @@ class TestFECClientErrorHandling:
 
         assert exc_info.value.retryable is False
 
-    @pytest.mark.integration
     async def test_500_raises_server_error(self):
         """5xx should raise FECServerError (retryable)."""
         client = FECClient()
@@ -50,7 +49,6 @@ class TestFECClientErrorHandling:
 
         assert exc_info.value.retryable is True
 
-    @pytest.mark.integration
     @patch("civic_lantern.services.fec_client.httpx.AsyncClient.get")
     async def test_get_candidates_raises_rate_limit_error(self, mock_get):
         """Public method should bubble up the correct custom exception."""
@@ -66,7 +64,6 @@ class TestFECClientErrorHandling:
         with pytest.raises(FECRateLimitError):
             await client.get_candidates(election_year=2024)
 
-    @pytest.mark.integration
     @respx.mock
     async def test_fetch_retries_on_500_error(self):
         """Client should retry 5xx errors."""
@@ -88,3 +85,17 @@ class TestFECClientErrorHandling:
 
         assert len(route.calls) == 2
         assert len(results) == 1
+
+    @respx.mock
+    @patch("asyncio.sleep", return_value=None)
+    async def test_fetch_gives_up_after_retries(self, _mock_sleep):
+        """Should give up after max retries, bypass waiting for backoff."""
+        async with FECClient() as client:
+            route = respx.get(url__startswith=client.candidate_url).mock(
+                return_value=httpx.Response(503, json={"error": "Unavailable"})
+            )
+
+            with pytest.raises(FECServerError):
+                await client.get_candidates(election_year=2024)
+
+        assert len(route.calls) == 3
