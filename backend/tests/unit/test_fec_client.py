@@ -12,7 +12,7 @@ from civic_lantern.services.fec_exceptions import (
 )
 
 
-@pytest.mark.integration
+@pytest.mark.unit
 @pytest.mark.asyncio
 class TestFECClientErrorHandling:
     """Test that HTTP errors map to correct exceptions."""
@@ -50,7 +50,8 @@ class TestFECClientErrorHandling:
         assert exc_info.value.retryable is True
 
     @patch("civic_lantern.services.fec_client.httpx.AsyncClient.get")
-    async def test_get_candidates_raises_rate_limit_error(self, mock_get):
+    @patch("asyncio.sleep", return_value=None)
+    async def test_get_candidates_raises_rate_limit_error(self, _mock_sleep, mock_get):
         """Public method should bubble up the correct custom exception."""
         client = FECClient()
 
@@ -65,7 +66,8 @@ class TestFECClientErrorHandling:
             await client.get_candidates(election_year=2024)
 
     @respx.mock
-    async def test_fetch_retries_on_500_error(self):
+    @patch("asyncio.sleep", return_value=None)
+    async def test_fetch_retries_on_500_error(self, _mock_sleep):
         """Client should retry 5xx errors."""
         async with FECClient() as client:
             route = respx.get(url__startswith=client.candidate_url).mock(
