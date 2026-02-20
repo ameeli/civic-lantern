@@ -5,10 +5,10 @@ from civic_lantern.jobs.ingestors.candidates import CandidateIngestor
 
 # Ordered by FK dependencies — parents before children.
 # ingest_all() executes these top to bottom.
-INGESTOR_REGISTRY: list[tuple[str, Type[BaseIngestor]]] = [
-    ("candidates", CandidateIngestor),
-    # ("committees", CommitteeIngestor),
-    # ("elections", ElectionIngestor),
-    # ("schedule_e", ScheduleEIngestor),        # after candidates, committees
-    # ("election_candidates", ElectionCandidateIngestor),  # last
-]
+INGESTOR_REGISTRY: dict[str, Type[BaseIngestor]] = {
+    "candidates": CandidateIngestor,
+    # "committees": CommitteeIngestor,
+    # "elections": ElectionIngestor,
+    # "schedule_e": ScheduleEIngestor,        # after candidates, committees
+    # "election_candidates": ElectionCandidateIngestor,  # last
+}

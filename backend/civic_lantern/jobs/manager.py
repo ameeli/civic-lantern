@@ -38,12 +38,11 @@ class IngestionManager:
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
         """Run a single ingestor by entity name."""
-        registry = dict(INGESTOR_REGISTRY)
-        ingestor_cls = registry.get(entity)
+        ingestor_cls = INGESTOR_REGISTRY.get(entity)
         if not ingestor_cls:
             raise ValueError(
                 f"Unknown entity: '{entity}'. "
-                f"Available: {[name for name, _ in INGESTOR_REGISTRY]}"
+                f"Available: {list(INGESTOR_REGISTRY)}"
             )
 
         async with AsyncSessionLocal() as session:
@@ -62,7 +61,7 @@ class IngestionManager:
         """
         results: Dict[str, Any] = {}
 
-        for name, _ in INGESTOR_REGISTRY:
+        for name in INGESTOR_REGISTRY:
             try:
                 results[name] = await self.ingest(name, start_date, end_date)
             except Exception as e:

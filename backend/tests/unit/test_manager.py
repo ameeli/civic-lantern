@@ -27,7 +27,7 @@ class TestIngestionManager:
         manager = IngestionManager()
         manager._client = AsyncMock()
 
-        registry = [("alpha", StubIngestor)]
+        registry = {"alpha": StubIngestor}
         with patch(
             "civic_lantern.jobs.manager.INGESTOR_REGISTRY",
             new=registry,
@@ -84,7 +84,7 @@ class TestIngestionManager:
         manager = IngestionManager()
         manager._client = AsyncMock()
 
-        registry = [("entity_a", FakeIngestorA), ("entity_b", FakeIngestorB)]
+        registry = {"entity_a": FakeIngestorA, "entity_b": FakeIngestorB}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             results = await manager.ingest_all()
 
@@ -116,7 +116,7 @@ class TestIngestionManager:
         manager = IngestionManager()
         manager._client = AsyncMock()
 
-        registry = [("failing", FailingIngestor), ("succeeding", SucceedingIngestor)]
+        registry = {"failing": FailingIngestor, "succeeding": SucceedingIngestor}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             results = await manager.ingest_all()
 
