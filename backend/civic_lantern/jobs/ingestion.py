@@ -1,12 +1,33 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from civic_lantern.jobs.manager import IngestionManager
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+FEC_TIMEZONE = ZoneInfo("America/New_York")
+
+
+class _EasternFormatter(logging.Formatter):
+    """Log formatter that renders timestamps in US/Eastern with offset."""
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
+        utc_dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        et_dt = utc_dt.astimezone(FEC_TIMEZONE)
+        if datefmt:
+            return et_dt.strftime(datefmt)
+        return et_dt.isoformat()
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(
+    _EasternFormatter(
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+    )
 )
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 
 
 async def ingest(
@@ -30,4 +51,4 @@ async def ingest(
 
 
 if __name__ == "__main__":
-    asyncio.run(ingest(start_date="2023-03-01", end_date="2023-06-01"))
+    asyncio.run(ingest(start_date="2023-06-01", end_date="2023-08-01"))

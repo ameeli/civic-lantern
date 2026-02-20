@@ -2,11 +2,15 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.services.data.base import BaseService
 from civic_lantern.services.fec_client import FECClient
+
+# FEC operates on the US/Eastern filing calendar
+FEC_TIMEZONE = ZoneInfo("America/New_York")
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +85,10 @@ class BaseIngestor(ABC):
     def _resolve_dates(
         self, start_date: Optional[str], end_date: Optional[str]
     ) -> tuple[str, str]:
-        """Default to last 7 days if dates not provided."""
+        """Default to last 7 days in US/Eastern (FEC filing calendar)."""
+        now_et = datetime.now(FEC_TIMEZONE)
         if not start_date:
-            start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+            start_date = (now_et - timedelta(days=7)).strftime("%Y-%m-%d")
         if not end_date:
-            end_date = datetime.now().strftime("%Y-%m-%d")
+            end_date = now_et.strftime("%Y-%m-%d")
         return start_date, end_date

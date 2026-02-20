@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -65,9 +66,10 @@ class TestBaseIngestorWorkflow:
 
         assert result is None
 
-    async def test_default_date_range(self, mocker):
-        """When no dates provided, defaults to last 7 days."""
-        fake_now = datetime(2025, 6, 15)
+    async def test_default_date_range_uses_eastern(self, mocker):
+        """When no dates provided, defaults to last 7 days in US/Eastern."""
+        fec_tz = ZoneInfo("America/New_York")
+        fake_now = datetime(2025, 6, 15, 10, 0, tzinfo=fec_tz)
         mock_dt = mocker.patch("civic_lantern.jobs.base_ingestor.datetime")
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -77,11 +79,12 @@ class TestBaseIngestorWorkflow:
             session=AsyncMock(),
         )
 
-        # Spy on _resolve_dates to check the output
         start, end = ingestor._resolve_dates(None, None)
 
         assert start == "2025-06-08"
         assert end == "2025-06-15"
+        # Verify now() was called with US/Eastern timezone
+        mock_dt.now.assert_called_once_with(fec_tz)
 
     async def test_provided_dates_pass_through(self):
         """Explicit dates are not overridden."""

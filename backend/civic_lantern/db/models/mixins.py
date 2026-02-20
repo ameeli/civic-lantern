@@ -5,7 +5,7 @@ CREATE_FUNC_DDL = DDL("""
     CREATE OR REPLACE FUNCTION set_updated_at()
     RETURNS TRIGGER AS $$
     BEGIN
-        NEW.updated_at = NOW();
+        NEW.updated_at = (NOW() AT TIME ZONE 'UTC');
         RETURN NEW;
     END;
     $$ language 'plpgsql';
