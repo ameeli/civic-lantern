@@ -7,7 +7,6 @@ from civic_lantern.jobs.manager import IngestionManager
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger(__name__)
 
 
 async def ingest(
@@ -27,18 +26,8 @@ async def ingest(
         Dict mapping entity names to their ingestion stats (or error info).
     """
     async with IngestionManager() as manager:
-        if entities:
-            results: Dict[str, Any] = {}
-            for name in entities:
-                try:
-                    results[name] = await manager.ingest(name, start_date, end_date)
-                except Exception as e:
-                    logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
-                    results[name] = {"error": str(e)}
-            return results
-
-        return await manager.ingest_all(start_date, end_date)
+        return await manager.ingest_batch(entities, start_date, end_date)
 
 
 if __name__ == "__main__":
-    asyncio.run(ingest(start_date="2023-01-01", end_date="2023-03-01"))
+    asyncio.run(ingest(start_date="2023-03-01", end_date="2023-06-01"))

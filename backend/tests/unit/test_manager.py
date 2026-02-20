@@ -58,8 +58,8 @@ class TestIngestionManager:
         mock_client.__aexit__.assert_awaited_once()
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
-    async def test_ingest_all_runs_in_order(self, MockSession):
-        """ingest_all() runs all ingestors in registry order."""
+    async def test_ingest_batch_runs_in_order(self, MockSession):
+        """ingest_batch() runs all ingestors in registry order."""
         call_order = []
 
         class FakeIngestorA:
@@ -86,15 +86,15 @@ class TestIngestionManager:
 
         registry = {"entity_a": FakeIngestorA, "entity_b": FakeIngestorB}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            results = await manager.ingest_all()
+            results = await manager.ingest_batch()
 
         assert call_order == ["a", "b"]
         assert "entity_a" in results
         assert "entity_b" in results
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
-    async def test_ingest_all_continues_on_failure(self, MockSession):
-        """A failed entity is recorded but doesn't block subsequent entities."""
+    async def test_ingest_batch_continues_on_failure(self, MockSession):
+        """A failed entity is recorded but doesn't block subsequent ones."""
 
         class FailingIngestor:
             def __init__(self, **kwargs):
@@ -118,7 +118,7 @@ class TestIngestionManager:
 
         registry = {"failing": FailingIngestor, "succeeding": SucceedingIngestor}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            results = await manager.ingest_all()
+            results = await manager.ingest_batch()
 
         assert "error" in results["failing"]
         assert results["succeeding"]["upserted"] == 5

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from civic_lantern.db.session import AsyncSessionLocal
 from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
@@ -14,8 +14,9 @@ class IngestionManager:
     Usage::
 
         async with IngestionManager() as manager:
-            await manager.ingest_all()                          # all entities
-            await manager.ingest("candidates", start_date=...) # single entity
+            await manager.ingest_batch()                             # all entities
+            await manager.ingest_batch(["candidates"])              # subset
+            await manager.ingest("candidates", start_date=...)  # single entity
     """
 
     def __init__(self) -> None:
@@ -49,19 +50,21 @@ class IngestionManager:
             ingestor = ingestor_cls(client=self._client, session=session)
             return await ingestor.run(start_date, end_date, **kwargs)
 
-    async def ingest_all(
+    async def ingest_batch(
         self,
+        entities: Optional[List[str]] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Run all registered ingestors in dependency order.
+        """Run ingestors for the given entities, or all if not specified.
 
-        Continues on failure — a failed entity is logged and recorded
-        in the results dict, but does not block subsequent entities.
+        Executes in dependency order. Continues on failure — a failed
+        entity is logged and recorded but does not block subsequent ones.
         """
+        targets = entities if entities else list(INGESTOR_REGISTRY)
         results: Dict[str, Any] = {}
 
-        for name in INGESTOR_REGISTRY:
+        for name in targets:
             try:
                 results[name] = await self.ingest(name, start_date, end_date)
             except Exception as e:
