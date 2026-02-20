@@ -1,12 +1,8 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
-from civic_lantern.db.session import AsyncSessionLocal
-from civic_lantern.services.data.candidate import CandidateService
-from civic_lantern.services.fec_client import FECClient
-from civic_lantern.utils.transformers import transform_candidates
+from civic_lantern.jobs.manager import IngestionManager
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -14,46 +10,35 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def ingest_candidates(
-    start_date: Optional[str] = None, end_date: Optional[str] = None
-):
-    """Import candidates from FEC API."""
-    if not start_date:
-        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+async def ingest(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    entities: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Run the FEC ingestion pipeline.
 
-    if not end_date:
-        end_date = datetime.now().strftime("%Y-%m-%d")
+    Args:
+        start_date: Start of date range (default: 7 days ago).
+        end_date: End of date range (default: today).
+        entities: Optional list of entity names to ingest.
+            If None, runs all registered entities in dependency order.
 
-    async with FECClient() as client:
-        # NOTE: only want to open this once, pass client to later ingestion scripts
-        logger.info(f"Syncing candidates from {start_date} to {end_date}")
-        raw_candidates = await client.get_candidates(
-            election_year=2024,
-            min_first_file_date=start_date,
-            max_first_file_date=end_date,
-            sort="-first_file_date",
-        )
-        transformed_candidates = transform_candidates(raw_candidates)
+    Returns:
+        Dict mapping entity names to their ingestion stats (or error info).
+    """
+    async with IngestionManager() as manager:
+        if entities:
+            results: Dict[str, Any] = {}
+            for name in entities:
+                try:
+                    results[name] = await manager.ingest(name, start_date, end_date)
+                except Exception as e:
+                    logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
+                    results[name] = {"error": str(e)}
+            return results
 
-        if not transformed_candidates:
-            logger.info("No candidates found to ingest.")
-            return
-
-        async with AsyncSessionLocal() as session:
-            candidate_service = CandidateService(db=session)
-
-            try:
-                stats = await candidate_service.upsert_batch(transformed_candidates)
-
-                logger.info(f"Ingestion complete for {start_date} to {end_date}")
-                logger.info(f"Success: {stats['upserted']}")
-                logger.info(f"Errors:  {stats['errors']}")
-
-                return stats
-            except Exception as e:
-                logger.error(f"❌ Ingestion failed: {e}", exc_info=True)
-                raise
+        return await manager.ingest_all(start_date, end_date)
 
 
 if __name__ == "__main__":
-    asyncio.run(ingest_candidates(start_date="2024-03-01", end_date="2024-08-01"))
+    asyncio.run(ingest(start_date="2023-01-01", end_date="2023-03-01"))
