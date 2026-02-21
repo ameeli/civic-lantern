@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -85,26 +86,22 @@ class FECClient:
             ) from e
 
     async def _paginate(
-        self, url: str, base_params: dict, max_pages: Optional[int] = None
+        self, url: str, base_params: dict
     ) -> List[Dict[str, Any]]:
         """Parallel pagination with a real-time progress bar."""
         p1_data = await self._fetch_page(url, {**base_params, "page": 1})
         results = p1_data.get("results", [])
 
-        total_pages = p1_data.get("pagination", {}).get("pages", 1)
-        last_page = min(total_pages, max_pages) if max_pages else total_pages
+        last_page = p1_data.get("pagination", {}).get("pages", 1)
 
         if not results or last_page <= 1:
             return results
 
-        async def safe_fetch(page_num: int):
-            """Wrapper that catches exceptions per task."""
-            try:
-                return await self._fetch_page(url, {**base_params, "page": page_num})
-            except Exception as e:
-                return e
-
-        tasks = [safe_fetch(p) for p in range(2, last_page + 1)]
+        concurrency_limit = asyncio.Semaphore(50)
+        tasks = [
+            self._safe_fetch_page(url, base_params, p, concurrency_limit)
+            for p in range(2, last_page + 1)
+        ]
 
         endpoint_name = url.rstrip("/").split("?")[0].split("/")[-1] or "data"
         responses = await tqdm_asyncio.gather(
@@ -113,13 +110,32 @@ class FECClient:
             unit="page",
         )
 
+        failed_pages = []
         for i, resp in enumerate(responses):
             if isinstance(resp, Exception):
                 tqdm.write(f"❌ Page {i + 2} failed: {resp}")
+                failed_pages.append(i + 2)
                 continue
             results.extend(resp.get("results", []))
 
+        if failed_pages:
+            logger.warning(
+                f"Partial results for {endpoint_name}: "
+                f"{len(failed_pages)}/{last_page} pages failed "
+                f"(pages {failed_pages}). {len(results)} records returned."
+            )
+
         return results
+
+    async def _safe_fetch_page(
+        self, url: str, params: dict, page: int, sem: asyncio.Semaphore
+    ):
+        async with sem:
+            try:
+                return await self._fetch_page(url, {**params, "page": page})
+            except Exception as e:
+                logger.warning(f"Page {page} failed: {e}")
+                return e
 
     async def get_candidates(self, per_page: int = 100, **kwargs) -> list[dict]:
         params = {
