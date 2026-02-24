@@ -11,7 +11,7 @@ class TestIngestionManager:
     """Test the IngestionManager routing, lifecycle, and failure handling."""
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
-    async def test_ingest_routes_to_correct_ingestor(self, MockSession):
+    async def test_ingest_routes_to_correct_ingestor(self, MockSession, manager):
         """ingest() looks up the entity in the registry and runs it."""
         mock_run = AsyncMock(return_value={"upserted": 1, "errors": 0})
 
@@ -21,11 +21,7 @@ class TestIngestionManager:
 
             run = mock_run
 
-        mock_session = AsyncMock()
-        MockSession.return_value.__aenter__.return_value = mock_session
-
-        manager = IngestionManager()
-        manager._client = AsyncMock()
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
 
         registry = {"alpha": StubIngestor}
         with patch(
@@ -37,11 +33,8 @@ class TestIngestionManager:
         assert result == {"upserted": 1, "errors": 0}
         mock_run.assert_awaited_once()
 
-    async def test_ingest_unknown_entity_raises(self):
+    async def test_ingest_unknown_entity_raises(self, manager):
         """ingest() raises ValueError for unregistered entity names."""
-        manager = IngestionManager()
-        manager._client = AsyncMock()
-
         with pytest.raises(ValueError, match="Unknown entity: 'nonexistent'"):
             await manager.ingest("nonexistent")
 
@@ -58,7 +51,7 @@ class TestIngestionManager:
         mock_client.__aexit__.assert_awaited_once()
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
-    async def test_ingest_batch_runs_in_order(self, MockSession):
+    async def test_ingest_batch_runs_in_order(self, MockSession, manager):
         """ingest_batch() runs all ingestors in registry order."""
         call_order = []
 
@@ -78,11 +71,7 @@ class TestIngestionManager:
                 call_order.append("b")
                 return {"upserted": 2, "errors": 0}
 
-        mock_session = AsyncMock()
-        MockSession.return_value.__aenter__.return_value = mock_session
-
-        manager = IngestionManager()
-        manager._client = AsyncMock()
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
 
         registry = {"entity_a": FakeIngestorA, "entity_b": FakeIngestorB}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
@@ -93,7 +82,7 @@ class TestIngestionManager:
         assert "entity_b" in results
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
-    async def test_ingest_batch_continues_on_failure(self, MockSession):
+    async def test_ingest_batch_continues_on_failure(self, MockSession, manager):
         """A failed entity is recorded but doesn't block subsequent ones."""
 
         class FailingIngestor:
@@ -110,11 +99,7 @@ class TestIngestionManager:
             async def run(self, *args, **kwargs):
                 return {"upserted": 5, "errors": 0, "failed_ids": []}
 
-        mock_session = AsyncMock()
-        MockSession.return_value.__aenter__.return_value = mock_session
-
-        manager = IngestionManager()
-        manager._client = AsyncMock()
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
 
         registry = {"failing": FailingIngestor, "succeeding": SucceedingIngestor}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):

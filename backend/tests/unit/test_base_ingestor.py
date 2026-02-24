@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock
+
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -39,11 +40,11 @@ class FakeIngestor(BaseIngestor):
 class TestBaseIngestorWorkflow:
     """Test the template method workflow in BaseIngestor."""
 
-    async def test_happy_path(self):
+    async def test_happy_path(self, mock_client, mock_session):
         """Fetch → transform → upsert returns stats."""
         ingestor = FakeIngestor(
-            client=AsyncMock(),
-            session=AsyncMock(),
+            client=mock_client,
+            session=mock_session,
             fetch_return=[{"id": "1"}],
             transform_return=["validated_obj"],
         )
@@ -53,11 +54,11 @@ class TestBaseIngestorWorkflow:
         assert stats["upserted"] == 1
         assert stats["errors"] == 0
 
-    async def test_empty_transform_returns_none(self):
+    async def test_empty_transform_returns_none(self, mock_client, mock_session):
         """When transform returns empty list, return None without upserting."""
         ingestor = FakeIngestor(
-            client=AsyncMock(),
-            session=AsyncMock(),
+            client=mock_client,
+            session=mock_session,
             fetch_return=[{"id": "1"}],
             transform_return=[],
         )
@@ -66,7 +67,7 @@ class TestBaseIngestorWorkflow:
 
         assert result is None
 
-    async def test_default_date_range_uses_eastern(self, mocker):
+    async def test_default_date_range_uses_eastern(self, mocker, mock_client, mock_session):
         """When no dates provided, defaults to last 7 days in US/Eastern."""
         fec_tz = ZoneInfo("America/New_York")
         fake_now = datetime(2025, 6, 15, 10, 0, tzinfo=fec_tz)
@@ -75,8 +76,8 @@ class TestBaseIngestorWorkflow:
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
         ingestor = FakeIngestor(
-            client=AsyncMock(),
-            session=AsyncMock(),
+            client=mock_client,
+            session=mock_session,
         )
 
         start, end = ingestor._resolve_dates(None, None)
@@ -86,11 +87,11 @@ class TestBaseIngestorWorkflow:
         # Verify now() was called with US/Eastern timezone
         mock_dt.now.assert_called_once_with(fec_tz)
 
-    async def test_provided_dates_pass_through(self):
+    async def test_provided_dates_pass_through(self, mock_client, mock_session):
         """Explicit dates are not overridden."""
         ingestor = FakeIngestor(
-            client=AsyncMock(),
-            session=AsyncMock(),
+            client=mock_client,
+            session=mock_session,
         )
 
         start, end = ingestor._resolve_dates("2024-03-01", "2024-09-01")
@@ -98,11 +99,11 @@ class TestBaseIngestorWorkflow:
         assert start == "2024-03-01"
         assert end == "2024-09-01"
 
-    async def test_upsert_error_propagates(self):
+    async def test_upsert_error_propagates(self, mock_client, mock_session):
         """Exceptions from upsert_batch bubble up after logging."""
         ingestor = FakeIngestor(
-            client=AsyncMock(),
-            session=AsyncMock(),
+            client=mock_client,
+            session=mock_session,
             fetch_return=[{"id": "1"}],
             transform_return=["validated_obj"],
         )
