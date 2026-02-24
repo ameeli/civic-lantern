@@ -1,11 +1,10 @@
 import asyncio
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, Mock
 
 import httpx
 import pytest
 import respx
 
-from civic_lantern.services.fec_client import FECClient
 from civic_lantern.services.fec_exceptions import (
     FECNetworkError,
     FECNotFoundError,
@@ -20,10 +19,8 @@ from civic_lantern.services.fec_exceptions import (
 class TestFECClientErrorHandling:
     """Test that HTTP errors map to correct exceptions."""
 
-    async def test_404_raises_not_found_error(self):
+    async def test_404_raises_not_found_error(self, client):
         """404 should raise FECNotFoundError (non-retryable)."""
-        client = FECClient()
-
         mock_response = Mock()
         mock_response.status_code = 404
 
@@ -36,10 +33,8 @@ class TestFECClientErrorHandling:
 
         assert exc_info.value.retryable is False
 
-    async def test_500_raises_server_error(self):
+    async def test_500_raises_server_error(self, client):
         """5xx should raise FECServerError (retryable)."""
-        client = FECClient()
-
         mock_response = Mock()
         mock_response.status_code = 503
 
@@ -52,84 +47,80 @@ class TestFECClientErrorHandling:
 
         assert exc_info.value.retryable is True
 
-    @patch("civic_lantern.services.fec_client.httpx.AsyncClient.get")
-    @patch("asyncio.sleep", return_value=None)
-    async def test_get_candidates_raises_rate_limit_error(self, _mock_sleep, mock_get):
+    async def test_get_candidates_raises_rate_limit_error(self, client, mocker):
         """Public method should bubble up the correct custom exception."""
-        client = FECClient()
-
+        mocker.patch("asyncio.sleep")
         mock_response = Mock()
         mock_response.status_code = 429
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Too Many Requests", request=Mock(), response=mock_response
         )
-        mock_get.return_value = mock_response
+        mocker.patch(
+            "civic_lantern.services.fec_client.httpx.AsyncClient.get",
+            return_value=mock_response,
+        )
 
         with pytest.raises(FECRateLimitError):
             await client.get_candidates(election_year=2024)
 
     @respx.mock
-    @patch("asyncio.sleep", return_value=None)
-    async def test_fetch_retries_on_500_error(self, _mock_sleep):
+    async def test_fetch_retries_on_500_error(self, client, mocker):
         """Client should retry 5xx errors."""
-        async with FECClient() as client:
-            route = respx.get(url__startswith=client.candidate_url).mock(
-                side_effect=[
-                    httpx.Response(500, json={"error": "Server error"}),
-                    httpx.Response(
-                        200,
-                        json={
-                            "results": [{"candidate_id": "C001", "name": "Test"}],
-                            "pagination": {"pages": 1},
-                        },
-                    ),
-                ]
-            )
+        mocker.patch("asyncio.sleep")
+        route = respx.get(url__startswith=client.candidate_url).mock(
+            side_effect=[
+                httpx.Response(500, json={"error": "Server error"}),
+                httpx.Response(
+                    200,
+                    json={
+                        "results": [{"candidate_id": "C001", "name": "Test"}],
+                        "pagination": {"pages": 1},
+                    },
+                ),
+            ]
+        )
 
-            results = await client.get_candidates(election_year=2024)
+        results = await client.get_candidates(election_year=2024)
 
         assert len(route.calls) == 2
         assert len(results) == 1
 
     @respx.mock
-    @patch("asyncio.sleep", return_value=None)
-    async def test_fetch_gives_up_after_retries(self, _mock_sleep):
+    async def test_fetch_gives_up_after_retries(self, client, mocker):
         """Should give up after max retries, bypass waiting for backoff."""
-        async with FECClient() as client:
-            route = respx.get(url__startswith=client.candidate_url).mock(
-                return_value=httpx.Response(503, json={"error": "Unavailable"})
-            )
+        mocker.patch("asyncio.sleep")
+        route = respx.get(url__startswith=client.candidate_url).mock(
+            return_value=httpx.Response(503, json={"error": "Unavailable"})
+        )
 
-            with pytest.raises(FECServerError):
-                await client.get_candidates(election_year=2024)
+        with pytest.raises(FECServerError):
+            await client.get_candidates(election_year=2024)
 
         assert len(route.calls) == 3
 
     @respx.mock
-    @patch("asyncio.sleep", return_value=None)
-    async def test_fetch_raises_timeout_error(self, _mock_sleep):
+    async def test_fetch_raises_timeout_error(self, client, mocker):
         """httpx.TimeoutException should raise FECTimeoutError (retryable)."""
-        async with FECClient() as client:
-            respx.get(url__startswith=client.candidate_url).mock(
-                side_effect=httpx.TimeoutException("timed out")
-            )
+        mocker.patch("asyncio.sleep")
+        respx.get(url__startswith=client.candidate_url).mock(
+            side_effect=httpx.TimeoutException("timed out")
+        )
 
-            with pytest.raises(FECTimeoutError) as exc_info:
-                await client.get_candidates(election_year=2024)
+        with pytest.raises(FECTimeoutError) as exc_info:
+            await client.get_candidates(election_year=2024)
 
         assert exc_info.value.retryable is True
 
     @respx.mock
-    @patch("asyncio.sleep", return_value=None)
-    async def test_fetch_raises_network_error(self, _mock_sleep):
+    async def test_fetch_raises_network_error(self, client, mocker):
         """httpx.NetworkError should raise FECNetworkError (retryable)."""
-        async with FECClient() as client:
-            respx.get(url__startswith=client.candidate_url).mock(
-                side_effect=httpx.NetworkError("connection refused")
-            )
+        mocker.patch("asyncio.sleep")
+        respx.get(url__startswith=client.candidate_url).mock(
+            side_effect=httpx.NetworkError("connection refused")
+        )
 
-            with pytest.raises(FECNetworkError) as exc_info:
-                await client.get_candidates(election_year=2024)
+        with pytest.raises(FECNetworkError) as exc_info:
+            await client.get_candidates(election_year=2024)
 
         assert exc_info.value.retryable is True
 
