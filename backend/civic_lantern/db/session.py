@@ -8,6 +8,7 @@ engine = create_async_engine(
     settings.DATABASE_URL_ASYNC,
     future=True,
     echo=False,
+    hide_parameters=True,
     pool_size=5,
     max_overflow=10,
 )
