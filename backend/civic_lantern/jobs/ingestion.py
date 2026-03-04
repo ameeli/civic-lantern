@@ -29,4 +29,11 @@ async def ingest(
 
 
 if __name__ == "__main__":
-    asyncio.run(ingest(start_date="2023-08-01", end_date="2023-09-01"))
+    # One-time backfill: all candidates who first filed during the 2024 FEC cycle.
+    asyncio.run(
+        ingest(
+            start_date="2023-01-01",
+            end_date="2024-12-31",
+            entities=["candidates"],
+        )
+    )
