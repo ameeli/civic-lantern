@@ -28,7 +28,8 @@ class FakeIngestor(BaseIngestor):
     def create_service(self) -> AsyncMock:
         service = AsyncMock()
         service.upsert_batch.return_value = {
-            "upserted": len(self._transform_return),
+            "inserted": len(self._transform_return),
+            "updated": 0,
             "errors": 0,
             "failed_ids": [],
         }
@@ -51,7 +52,7 @@ class TestBaseIngestorWorkflow:
 
         stats = await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
 
-        assert stats["upserted"] == 1
+        assert stats["inserted"] == 1
         assert stats["errors"] == 0
 
     async def test_empty_transform_returns_none(self, mock_client, mock_session):

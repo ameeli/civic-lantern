@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from civic_lantern.jobs.base_ingestor import BaseIngestor
 from civic_lantern.services.data.candidate import CandidateService
@@ -11,14 +11,21 @@ class CandidateIngestor(BaseIngestor):
     entity_name = "candidates"
 
     async def fetch(
-        self, start_date: str, end_date: str, **kwargs: Any
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        **kwargs: Any,
     ) -> List[Dict[str, Any]]:
-        """Fetch candidates from FEC API."""
-        return await self.client.get_candidates(
-            min_first_file_date=start_date,
-            max_first_file_date=end_date,
-            **kwargs,
-        )
+        """Fetch candidates from FEC API.
+
+        Pass start_date/end_date to filter by first file date.
+        Pass election_year to filter by cycle. Omitting all returns unfiltered results.
+        """
+        if start_date or end_date:
+            start_date, end_date = self._resolve_dates(start_date, end_date)
+            kwargs["min_first_file_date"] = start_date
+            kwargs["max_first_file_date"] = end_date
+        return await self.client.get_candidates(**kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
         """Validate raw candidate dicts through CandidateIn schema."""

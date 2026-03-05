@@ -30,15 +30,12 @@ class BaseIngestor(ABC):
 
     async def run(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
         """Execute the ingestion pipeline: fetch → transform → upsert."""
-        start_date, end_date = self._resolve_dates(start_date, end_date)
-        self.logger.info(f"Syncing {self.entity_name} from {start_date} to {end_date}")
+        self.logger.info(f"Syncing {self.entity_name}")
 
-        raw_data = await self.fetch(start_date, end_date, **kwargs)
+        raw_data = await self.fetch(**kwargs)
         transformed = self.transform(raw_data)
 
         if not transformed:
@@ -50,7 +47,9 @@ class BaseIngestor(ABC):
             stats = await service.upsert_batch(transformed)
             self.logger.info(
                 f"{self.entity_name} complete: "
-                f"{stats['upserted']} upserted, {stats['errors']} errors"
+                f"{stats['inserted']} inserted, "
+                f"{stats['updated']} updated, "
+                f"{stats['errors']} errors"
             )
             return stats
         except Exception as e:
@@ -66,9 +65,7 @@ class BaseIngestor(ABC):
         ...
 
     @abstractmethod
-    async def fetch(
-        self, start_date: str, end_date: str, **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+    async def fetch(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """Fetch raw data from the FEC API."""
         ...
 

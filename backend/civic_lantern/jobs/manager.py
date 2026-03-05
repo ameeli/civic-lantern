@@ -48,13 +48,14 @@ class IngestionManager:
 
         async with AsyncSessionLocal() as session:
             ingestor = ingestor_cls(client=self._client, session=session)
-            return await ingestor.run(start_date, end_date, **kwargs)
+            return await ingestor.run(start_date=start_date, end_date=end_date, **kwargs)
 
     async def ingest_batch(
         self,
         entities: Optional[List[str]] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Run ingestors for the given entities, or all if not specified.
 
@@ -66,7 +67,7 @@ class IngestionManager:
 
         for name in targets:
             try:
-                results[name] = await self.ingest(name, start_date, end_date)
+                results[name] = await self.ingest(name, start_date, end_date, **kwargs)
             except Exception as e:
                 logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
                 results[name] = {"error": str(e)}

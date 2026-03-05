@@ -18,7 +18,7 @@ class TestCandidateUpsert:
 
         stats = await service.upsert_batch(candidates)
 
-        assert stats["upserted"] == 1
+        assert stats["inserted"] == 1
         assert stats["errors"] == 0
 
         retrieved = await service.get_by_id("C001")
@@ -30,7 +30,8 @@ class TestCandidateUpsert:
 
         stats = await service.upsert_batch([])
 
-        assert stats["upserted"] == 0
+        assert stats["inserted"] == 0
+        assert stats["updated"] == 0
         assert stats["errors"] == 0
         assert stats["failed_ids"] == []
 
@@ -95,7 +96,7 @@ class TestCandidateUpsert:
         ]
 
         stats = await service.upsert_batch(candidates, batch_size=5)
-        assert stats["upserted"] == 15
+        assert stats["inserted"] == 15
 
         result = await async_db.execute(
             select(service.model).where(service.model.candidate_id.like("C_BATCH_%"))
@@ -126,7 +127,7 @@ class TestCandidateUpsert:
 
         stats = await service.upsert_batch(mixed_batch)
 
-        assert stats["upserted"] == 3
+        assert stats["inserted"] + stats["updated"] == 3
         assert stats["errors"] == 0
 
         updated = await service.get_by_id("C_EXIST")
@@ -147,7 +148,7 @@ class TestCandidateUpsert:
 
         stats = await service.upsert_batch(batch)
 
-        assert stats["upserted"] == 2
+        assert stats["inserted"] + stats["updated"] == 2
         assert stats["errors"] == 1
         assert "C_INVALID" in stats["failed_ids"]
 
@@ -166,7 +167,7 @@ class TestCandidateUpsert:
         ]
 
         stats = await service.upsert_batch(batch)
-        assert stats["upserted"] == 3
+        assert stats["inserted"] + stats["updated"] == 3
 
         retrieved = await service.get_by_id("C_DUP")
         assert retrieved.name == "Third"

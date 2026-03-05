@@ -16,19 +16,19 @@ class CandidateSpendingSchema(BaseModel):
 
     @computed_field
     @property
-    def influence_ratio(self) -> Decimal:
+    def influence_ratio(self) -> Optional[Decimal]:
         disbursements = self.inside_disbursements or Decimal("0")
         support = self.outside_support or Decimal("0")
         oppose = self.outside_oppose or Decimal("0")
         if disbursements > 0:
             return round((support + oppose) / disbursements, 2)
-        return Decimal("0.00")
+        return None
 
     @computed_field
     @property
-    def vulnerability_factor(self) -> Decimal:
+    def vulnerability_factor(self) -> Optional[Decimal]:
         disbursements = self.inside_disbursements or Decimal("0")
         oppose = self.outside_oppose or Decimal("0")
         if disbursements > 0:
             return round(oppose / disbursements, 2)
-        return Decimal("0.00")
+        return None

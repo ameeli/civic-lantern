@@ -13,7 +13,7 @@ class TestIngestionManager:
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
     async def test_ingest_routes_to_correct_ingestor(self, MockSession, manager):
         """ingest() looks up the entity in the registry and runs it."""
-        mock_run = AsyncMock(return_value={"upserted": 1, "errors": 0})
+        mock_run = AsyncMock(return_value={"inserted": 1, "updated": 0, "errors": 0})
 
         class StubIngestor:
             def __init__(self, **kwargs):
@@ -30,7 +30,7 @@ class TestIngestionManager:
         ):
             result = await manager.ingest("alpha", start_date="2024-01-01")
 
-        assert result == {"upserted": 1, "errors": 0}
+        assert result == {"inserted": 1, "updated": 0, "errors": 0}
         mock_run.assert_awaited_once()
 
     async def test_ingest_unknown_entity_raises(self, manager):
@@ -61,7 +61,7 @@ class TestIngestionManager:
 
             async def run(self, *args, **kwargs):
                 call_order.append("a")
-                return {"upserted": 1, "errors": 0}
+                return {"inserted": 1, "updated": 0, "errors": 0}
 
         class FakeIngestorB:
             def __init__(self, **kwargs):
@@ -69,7 +69,7 @@ class TestIngestionManager:
 
             async def run(self, *args, **kwargs):
                 call_order.append("b")
-                return {"upserted": 2, "errors": 0}
+                return {"inserted": 2, "updated": 0, "errors": 0}
 
         MockSession.return_value.__aenter__.return_value = AsyncMock()
 
@@ -97,7 +97,7 @@ class TestIngestionManager:
                 pass
 
             async def run(self, *args, **kwargs):
-                return {"upserted": 5, "errors": 0, "failed_ids": []}
+                return {"inserted": 5, "updated": 0, "errors": 0, "failed_ids": []}
 
         MockSession.return_value.__aenter__.return_value = AsyncMock()
 
@@ -106,4 +106,4 @@ class TestIngestionManager:
             results = await manager.ingest_batch()
 
         assert "error" in results["failing"]
-        assert results["succeeding"]["upserted"] == 5
+        assert results["succeeding"]["inserted"] == 5

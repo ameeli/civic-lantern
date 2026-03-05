@@ -15,7 +15,7 @@ class TestIngestEntryPoint:
         """ingest() passes all args through to manager.ingest_batch()."""
         mock_manager = MockManager.return_value.__aenter__.return_value
         mock_manager.ingest_batch.return_value = {
-            "candidates": {"upserted": 10, "errors": 0}
+            "candidates": {"inserted": 8, "updated": 2, "errors": 0}
         }
 
         results = await ingest(
@@ -27,7 +27,7 @@ class TestIngestEntryPoint:
         mock_manager.ingest_batch.assert_awaited_once_with(
             ["candidates"], "2024-01-01", "2024-06-01"
         )
-        assert results["candidates"]["upserted"] == 10
+        assert results["candidates"]["inserted"] + results["candidates"]["updated"] == 10
 
     @patch("civic_lantern.jobs.ingestion.IngestionManager", autospec=True)
     async def test_ingest_passes_none_when_no_entities(self, MockManager):

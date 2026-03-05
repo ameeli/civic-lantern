@@ -12,6 +12,7 @@ async def ingest(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     entities: Optional[List[str]] = None,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Run the FEC ingestion pipeline.
 
@@ -20,20 +21,20 @@ async def ingest(
         end_date: End of date range (default: today).
         entities: Optional list of entity names to ingest.
             If None, runs all registered entities in dependency order.
+        **kwargs: Additional params forwarded to each ingestor's fetch()
+            (e.g. cycle=2024 for spending ingestors).
 
     Returns:
         Dict mapping entity names to their ingestion stats (or error info).
     """
     async with IngestionManager() as manager:
-        return await manager.ingest_batch(entities, start_date, end_date)
+        return await manager.ingest_batch(entities, start_date, end_date, **kwargs)
 
 
 if __name__ == "__main__":
-    # One-time backfill: all candidates who first filed during the 2024 FEC cycle.
     asyncio.run(
         ingest(
-            start_date="2023-01-01",
-            end_date="2024-12-31",
-            entities=["candidates"],
+            cycle=2024,
+            entities=["spending_totals"],
         )
     )

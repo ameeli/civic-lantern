@@ -85,9 +85,7 @@ class FECClient:
                 f"HTTP {status} error", status_code=status, response=response
             ) from e
 
-    async def _paginate(
-        self, url: str, base_params: dict
-    ) -> List[Dict[str, Any]]:
+    async def _paginate(self, url: str, base_params: dict) -> List[Dict[str, Any]]:
         """Parallel pagination with a real-time progress bar."""
         p1_data = await self._fetch_page(url, {**base_params, "page": 1})
         results = p1_data.get("results", [])
@@ -147,6 +145,39 @@ class FECClient:
         candidates = await self._paginate(self.candidate_url, params)
         logger.info(f"✅ Fetched {len(candidates)} candidates")
         return candidates
+
+    async def get_candidate_totals(
+        self, cycle: int = 2024, per_page: int = 100, **kwargs
+    ) -> list[dict]:
+        """Fetch inside spending totals for candidates."""
+        url = f"{self.base_url}/candidates/totals/"
+        params = {
+            "api_key": self.api_key,
+            "cycle": cycle,
+            "election_full": "true",
+            "per_page": per_page,
+            **kwargs,
+        }
+
+        totals = await self._paginate(url, params)
+        logger.info(f"✅ Fetched {len(totals)} inside candidate totals")
+        return totals
+
+    async def get_outside_spending_totals(
+        self, cycle: int = 2024, per_page: int = 100, **kwargs
+    ) -> list[dict]:
+        """Fetch independent expenditures aggregated by candidate."""
+        url = f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
+        params = {
+            "api_key": self.api_key,
+            "cycle": cycle,
+            "per_page": per_page,
+            **kwargs,
+        }
+
+        totals = await self._paginate(url, params)
+        logger.info(f"✅ Fetched {len(totals)} outside spending records")
+        return totals
 
     async def __aenter__(self):
         return self

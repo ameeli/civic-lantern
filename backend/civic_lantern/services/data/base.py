@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, Generic, List, Type, TypeVar, Union
 
 from pydantic import BaseModel
-from sqlalchemy import exc, inspect, select
+from sqlalchemy import exc, inspect, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,22 +34,26 @@ class BaseService(Generic[T]):
         If a batch fails, falls back to row-by-row processing.
         """
         if not data:
-            return {"upserted": 0, "errors": 0, "failed_ids": []}
+            return {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
 
         if data and isinstance(data[0], BaseModel):
             data = [item.model_dump() for item in data]
 
-        stats = {"upserted": 0, "errors": 0, "failed_ids": []}
+        stats = {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
 
         for i in range(0, len(data), batch_size):
             batch = data[i : i + batch_size]
 
             try:
-                await self._execute_upsert(batch)
+                inserted, updated = await self._execute_upsert(batch)
                 await self.db.commit()
 
-                stats["upserted"] += len(batch)
-                logger.debug(f"Upserted batch of {len(batch)} {self.model.__name__}s")
+                stats["inserted"] += inserted
+                stats["updated"] += updated
+                logger.debug(
+                    f"Batch {self.model.__name__}: "
+                    f"{inserted} inserted, {updated} updated"
+                )
 
             except exc.SQLAlchemyError as e:
                 await self.db.rollback()
@@ -60,28 +64,33 @@ class BaseService(Generic[T]):
 
                 batch_stats = await self._process_batch_individually(batch)
 
-                stats["upserted"] += batch_stats["success_count"]
+                stats["inserted"] += batch_stats["inserted"]
+                stats["updated"] += batch_stats["updated"]
                 stats["errors"] += batch_stats["error_count"]
                 stats["failed_ids"].extend(batch_stats["failed_ids"])
 
         logger.info(
-            f"Upsert complete. Success: {stats['upserted']}, Errors: {stats['errors']}"
+            f"Upsert complete. "
+            f"Inserted: {stats['inserted']}, "
+            f"Updated: {stats['updated']}, "
+            f"Errors: {stats['errors']}"
         )
 
         return stats
 
     async def _process_batch_individually(self, batch: List[dict]) -> Dict[str, Any]:
         """Helper to process a failed batch one row at a time."""
-        stats = {"success_count": 0, "error_count": 0, "failed_ids": []}
+        stats = {"inserted": 0, "updated": 0, "error_count": 0, "failed_ids": []}
 
         for row in batch:
             row_id = row.get(self.pk_name, "UNKNOWN")
 
             try:
                 async with self.db.begin_nested():
-                    await self._execute_upsert([row])
+                    inserted, updated = await self._execute_upsert([row])
 
-                stats["success_count"] += 1
+                stats["inserted"] += inserted
+                stats["updated"] += updated
 
             except Exception as e:
                 stats["error_count"] += 1
@@ -93,8 +102,12 @@ class BaseService(Generic[T]):
         await self.db.commit()
         return stats
 
-    async def _execute_upsert(self, values: List[dict]) -> None:
-        """Constructs and executes the PostgreSQL upsert statement."""
+    async def _execute_upsert(self, values: List[dict]) -> tuple[int, int]:
+        """Constructs and executes the PostgreSQL upsert statement.
+
+        Returns (inserted_count, updated_count) using the xmax system column:
+        xmax = 0 means the row was inserted; xmax != 0 means it was updated.
+        """
         stmt = insert(self.model).values(values)
 
         update_cols = {
@@ -103,9 +116,23 @@ class BaseService(Generic[T]):
             if col.name not in self.index_elements and col.name != "created_at"
         }
 
+        # Only update when at least one meaningful column actually changed.
+        # Excludes updated_at (trigger-managed) to avoid counting timestamp-only diffs.
+        table = self.model.__table__
+        changed_conditions = [
+            table.c[name].is_distinct_from(excl_col)
+            for name, excl_col in update_cols.items()
+            if name != "updated_at"
+        ]
+
         upsert_stmt = stmt.on_conflict_do_update(
             index_elements=self.index_elements,
             set_=update_cols,
-        )
+            where=or_(*changed_conditions) if changed_conditions else None,
+        ).returning(literal_column("xmax::text::bigint"))
 
-        await self.db.execute(upsert_stmt)
+        result = await self.db.execute(upsert_stmt)
+        rows = result.fetchall()
+        inserted = sum(1 for row in rows if row[0] == 0)
+        updated = len(rows) - inserted
+        return inserted, updated
