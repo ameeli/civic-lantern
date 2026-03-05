@@ -29,3 +29,9 @@ def configure_logging() -> None:
         )
     )
     logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+    # Suppress noisy third-party loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
