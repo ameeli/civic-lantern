@@ -39,16 +39,23 @@ class IngestionManager:
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
         """Run a single ingestor by entity name."""
+        if self._client is None:
+            raise RuntimeError(
+                "IngestionManager must be used as an async context manager. "
+                "Use 'async with IngestionManager() as manager:'"
+            )
+
         ingestor_cls = INGESTOR_REGISTRY.get(entity)
         if not ingestor_cls:
             raise ValueError(
-                f"Unknown entity: '{entity}'. "
-                f"Available: {list(INGESTOR_REGISTRY)}"
+                f"Unknown entity: '{entity}'. Available: {list(INGESTOR_REGISTRY)}"
             )
 
         async with AsyncSessionLocal() as session:
             ingestor = ingestor_cls(client=self._client, session=session)
-            return await ingestor.run(start_date=start_date, end_date=end_date, **kwargs)
+            return await ingestor.run(
+                start_date=start_date, end_date=end_date, **kwargs
+            )
 
     async def ingest_batch(
         self,
@@ -62,7 +69,12 @@ class IngestionManager:
         Executes in dependency order. Continues on failure — a failed
         entity is logged and recorded but does not block subsequent ones.
         """
-        targets = entities if entities else list(INGESTOR_REGISTRY)
+        if entities:
+            registry_keys = list(INGESTOR_REGISTRY.keys())
+            targets = sorted(entities, key=lambda x: registry_keys.index(x))
+        else:
+            targets = list(INGESTOR_REGISTRY.keys())
+
         results: Dict[str, Any] = {}
 
         for name in targets:
