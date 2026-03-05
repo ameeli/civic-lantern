@@ -26,8 +26,20 @@ def transform_candidates(raw_candidates: List[Dict[str, Any]]) -> List[Candidate
         except Exception as e:
             logger.error(f"Unexpected crash on candidate {c_id}: {e}")
 
+    # Deduplicate by candidate_id — FEC API can return the same candidate across
+    # multiple pages. Keep the last occurrence (most recently seen data).
+    seen: dict[str, CandidateIn] = {}
+    for candidate in transformed:
+        seen[candidate.candidate_id] = candidate
+    deduped = list(seen.values())
+
+    if len(deduped) < len(transformed):
+        logger.warning(
+            f"Dropped {len(transformed) - len(deduped)} duplicate candidate_id(s)."
+        )
+
     logger.info(
-        f"Successfully transformed {len(transformed)}/{len(raw_candidates)} records."
+        f"Successfully transformed {len(deduped)}/{len(raw_candidates)} records."
     )
 
-    return transformed
+    return deduped
