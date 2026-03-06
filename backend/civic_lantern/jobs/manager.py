@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import text
+
 from civic_lantern.db.session import AsyncSessionLocal
 from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
 from civic_lantern.services.fec_client import FECClient
@@ -84,4 +86,28 @@ class IngestionManager:
                 logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
                 results[name] = {"error": str(e)}
 
+        # Update materialized view only if spending ingestion succeeded
+        spending_result = results.get("spending_totals", {})
+        if "spending_totals" in targets and "error" not in spending_result:
+            await self.refresh_spending_stats()
+
         return results
+
+    async def refresh_spending_stats(self) -> None:
+        """Refresh the materialized view for global spending totals."""
+        async with AsyncSessionLocal() as session:
+            try:
+                # CONCURRENTLY allows reads to continue while refreshing
+                await session.execute(
+                    text(
+                        "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+                        "mv_election_spending_summary"
+                    )
+                )
+                await session.commit()
+                logger.info(
+                    "✅ Materialized view 'mv_election_spending_summary' refreshed."
+                )
+            except Exception as e:
+                logger.error(f"Failed to refresh materialized view: {e}", exc_info=True)
+                await session.rollback()

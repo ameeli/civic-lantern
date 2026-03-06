@@ -1,6 +1,7 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import TextClause
 
 from civic_lantern.jobs.manager import IngestionManager
 
@@ -107,3 +108,57 @@ class TestIngestionManager:
 
         assert "error" in results["failing"]
         assert results["succeeding"]["inserted"] == 5
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    async def test_refresh_spending_stats_uses_text(self, MockSession, manager):
+        """refresh_spending_stats() wraps the SQL string in text()."""
+        mock_session = AsyncMock()
+        MockSession.return_value.__aenter__.return_value = mock_session
+
+        await manager.refresh_spending_stats()
+
+        mock_session.execute.assert_awaited_once()
+        call_arg = mock_session.execute.call_args[0][0]
+        assert isinstance(call_arg, TextClause)
+        assert "mv_election_spending_summary" in str(call_arg)
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    async def test_ingest_batch_refreshes_mv_on_spending_success(
+        self, MockSession, manager
+    ):
+        """MV refresh is triggered when spending_totals ingestion succeeds."""
+        mock_ingestor = MagicMock()
+        mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
+        registry = {"spending_totals": mock_ingestor}
+
+        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
+            with patch.object(
+                manager, "refresh_spending_stats", new_callable=AsyncMock
+            ) as mock_refresh:
+                await manager.ingest_batch()
+
+        mock_refresh.assert_awaited_once()
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
+        self, MockSession, manager
+    ):
+        """MV refresh is skipped when spending_totals ingestion errors."""
+
+        class FailingSpendingIngestor:
+            def __init__(self, **kwargs):
+                pass
+
+            async def run(self, *args, **kwargs):
+                raise RuntimeError("spending fetch failed")
+
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+
+        registry = {"spending_totals": FailingSpendingIngestor}
+        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
+            with patch.object(
+                manager, "refresh_spending_stats", new_callable=AsyncMock
+            ) as mock_refresh:
+                await manager.ingest_batch()
+
+        mock_refresh.assert_not_awaited()
