@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from civic_lantern.schemas.spending import CandidateSpendingSchema
+from civic_lantern.schemas.candidate_spending import CandidateSpendingSchema
 
 
 @pytest.mark.unit

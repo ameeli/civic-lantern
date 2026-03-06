@@ -35,6 +35,6 @@ if __name__ == "__main__":
     asyncio.run(
         ingest(
             cycle=2024,
-            entities=["spending_totals"],
+            entities=["candidate_spending"],
         )
     )

@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 from pydantic import ValidationError
 
 from civic_lantern.jobs.base_ingestor import BaseIngestor
-from civic_lantern.schemas.spending import CandidateSpendingSchema
-from civic_lantern.services.data.spending import CandidateSpendingService
+from civic_lantern.schemas.candidate_spending import CandidateSpendingSchema
+from civic_lantern.services.data.candidate_spending import CandidateSpendingService
 
 
 class SpendingIngestor(BaseIngestor):
@@ -16,7 +16,7 @@ class SpendingIngestor(BaseIngestor):
     Merges /candidates/totals and /schedules/schedule_e/totals/by_candidate.
     """
 
-    entity_name = "spending_totals"
+    entity_name = "candidate_spending"
 
     async def fetch(self, cycle: int = 2024, **kwargs: Any) -> Dict[str, Any]:
         """Fetches Inside and Outside totals concurrently."""

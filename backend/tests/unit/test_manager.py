@@ -126,10 +126,10 @@ class TestIngestionManager:
     async def test_ingest_batch_refreshes_mv_on_spending_success(
         self, MockSession, manager
     ):
-        """MV refresh is triggered when spending_totals ingestion succeeds."""
+        """MV refresh is triggered when candidate_spending ingestion succeeds."""
         mock_ingestor = MagicMock()
         mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
-        registry = {"spending_totals": mock_ingestor}
+        registry = {"candidate_spending": mock_ingestor}
 
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             with patch.object(
@@ -143,7 +143,7 @@ class TestIngestionManager:
     async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
         self, MockSession, manager
     ):
-        """MV refresh is skipped when spending_totals ingestion errors."""
+        """MV refresh is skipped when candidate_spending ingestion errors."""
 
         class FailingSpendingIngestor:
             def __init__(self, **kwargs):
@@ -154,7 +154,7 @@ class TestIngestionManager:
 
         MockSession.return_value.__aenter__.return_value = AsyncMock()
 
-        registry = {"spending_totals": FailingSpendingIngestor}
+        registry = {"candidate_spending": FailingSpendingIngestor}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             with patch.object(
                 manager, "refresh_spending_stats", new_callable=AsyncMock

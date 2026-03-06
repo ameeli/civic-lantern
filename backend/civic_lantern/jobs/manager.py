@@ -87,8 +87,8 @@ class IngestionManager:
                 results[name] = {"error": str(e)}
 
         # Update materialized view only if spending ingestion succeeded
-        spending_result = results.get("spending_totals", {})
-        if "spending_totals" in targets and "error" not in spending_result:
+        spending_result = results.get("candidate_spending", {})
+        if "candidate_spending" in targets and "error" not in spending_result:
             await self.refresh_spending_stats()
 
         return results

@@ -2,9 +2,9 @@ from decimal import Decimal
 
 import pytest
 
-from civic_lantern.jobs.ingestors.spending import SpendingIngestor
-from civic_lantern.schemas.spending import CandidateSpendingSchema
-from civic_lantern.services.data.spending import CandidateSpendingService
+from civic_lantern.jobs.ingestors.candidate_spending import SpendingIngestor
+from civic_lantern.schemas.candidate_spending import CandidateSpendingSchema
+from civic_lantern.services.data.candidate_spending import CandidateSpendingService
 
 # ---------------------------------------------------------------------------
 # Fetch
@@ -350,8 +350,8 @@ class TestSpendingIngestorWiring:
         return SpendingIngestor(client=mock_client, session=mock_session)
 
     async def test_entity_name(self, ingestor):
-        """entity_name is 'spending_totals'."""
-        assert ingestor.entity_name == "spending_totals"
+        """entity_name is 'candidate_spending'."""
+        assert ingestor.entity_name == "candidate_spending"
 
     async def test_create_service_returns_spending_service(
         self, ingestor, mock_session
@@ -369,8 +369,8 @@ class TestSpendingIngestorWiring:
         assert service.index_elements == ["candidate_id", "cycle"]
 
     async def test_spending_totals_registered_in_registry(self, ingestor):
-        """spending_totals is present in the ingestor registry."""
+        """candidate_spending is present in the ingestor registry."""
         from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
 
-        assert "spending_totals" in INGESTOR_REGISTRY
-        assert INGESTOR_REGISTRY["spending_totals"] is SpendingIngestor
+        assert "candidate_spending" in INGESTOR_REGISTRY
+        assert INGESTOR_REGISTRY["candidate_spending"] is SpendingIngestor

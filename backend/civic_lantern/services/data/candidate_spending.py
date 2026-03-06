@@ -1,4 +1,4 @@
-from civic_lantern.db.models.spending import CandidateSpendingTotals
+from civic_lantern.db.models.candidate_spending import CandidateSpendingTotals
 from civic_lantern.services.data.base import BaseService
 
 
