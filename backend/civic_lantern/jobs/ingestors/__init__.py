@@ -1,8 +1,8 @@
 from typing import Type
 
 from civic_lantern.jobs.base_ingestor import BaseIngestor
-from civic_lantern.jobs.ingestors.candidates import CandidateIngestor
 from civic_lantern.jobs.ingestors.candidate_spending import SpendingIngestor
+from civic_lantern.jobs.ingestors.candidates import CandidateIngestor
 
 # Ordered by FK dependencies — parents before children.
 # ingest_all() executes these top to bottom.
