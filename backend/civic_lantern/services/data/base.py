@@ -37,7 +37,11 @@ class BaseService(Generic[T]):
             return {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
 
         if data and isinstance(data[0], BaseModel):
-            data = [item.model_dump() for item in data]
+            table_columns = {col.name for col in self.model.__table__.columns}
+            data = [
+                {k: v for k, v in item.model_dump().items() if k in table_columns}
+                for item in data
+            ]
 
         stats = {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
 

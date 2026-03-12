@@ -2,6 +2,7 @@ from typing import Any, Literal
 
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from civic_lantern.db.models.candidate_spending import CandidateSpendingTotals
 from civic_lantern.schemas.candidate_spending import SpendingSortBy
@@ -15,7 +16,9 @@ class CandidateSpendingService(BaseService[CandidateSpendingTotals]):
 
     def _build_base_query(self) -> Any:
         """Return the base SELECT statement with filters applied."""
-        return select(CandidateSpendingTotals)
+        return select(CandidateSpendingTotals).options(
+            joinedload(CandidateSpendingTotals.candidate)
+        )
 
     def _apply_sorting(
         self,

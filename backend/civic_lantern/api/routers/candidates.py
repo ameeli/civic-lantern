@@ -3,6 +3,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from civic_lantern.api.deps import get_db
 from civic_lantern.db.models.candidate import Candidate
@@ -94,6 +95,7 @@ async def get_candidate_spending(
 
     result = await db.execute(
         select(CandidateSpendingTotals)
+        .options(joinedload(CandidateSpendingTotals.candidate))
         .where(CandidateSpendingTotals.candidate_id == candidate_id)
         .order_by(CandidateSpendingTotals.cycle)
     )

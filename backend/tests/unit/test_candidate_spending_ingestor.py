@@ -203,6 +203,19 @@ class TestMergeFecData:
         ids = {r["candidate_id"] for r in result}
         assert ids == {"H1TX00001", "S1TX00002"}
 
+    def test_accumulates_multiple_inside_rows(self, ingestor):
+        """Multiple inside rows for the same candidate are summed, not overwritten."""
+        inside = [
+            {"candidate_id": "P80001571", "receipts": "3852434.85", "disbursements": "831532.74"},
+            {"candidate_id": "P80001571", "receipts": "0.00", "disbursements": "0.00"},
+        ]
+
+        result = ingestor._merge_fec_data(2024, inside, [])
+
+        assert len(result) == 1
+        assert result[0]["inside_receipts"] == Decimal("3852434.85")
+        assert result[0]["inside_disbursements"] == Decimal("831532.74")
+
     def test_empty_inputs_return_empty(self, ingestor):
         """Both empty inside and outside yields an empty result."""
         assert ingestor._merge_fec_data(2024, [], []) == []

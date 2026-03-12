@@ -69,8 +69,8 @@ class SpendingIngestor(BaseIngestor):
         for item in inside:
             cid = item["candidate_id"]
             merged[cid]["candidate_id"] = cid
-            merged[cid]["inside_receipts"] = Decimal(str(item.get("receipts") or 0))
-            merged[cid]["inside_disbursements"] = Decimal(
+            merged[cid]["inside_receipts"] += Decimal(str(item.get("receipts") or 0))
+            merged[cid]["inside_disbursements"] += Decimal(
                 str(item.get("disbursements") or 0)
             )
 
