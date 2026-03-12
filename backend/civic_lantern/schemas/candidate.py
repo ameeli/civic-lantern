@@ -1,10 +1,12 @@
 import re
 from datetime import date, datetime
-from typing import Any, List, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from civic_lantern.db.models.enums import OfficeTypeEnum
+
+CandidateSortBy = Literal["name", "state", "first_file_date", "last_file_date"]
 
 
 class CandidateIn(BaseModel):
@@ -19,8 +21,8 @@ class CandidateIn(BaseModel):
     incumbent_challenge_full: Optional[str] = None
     candidate_status: Optional[str] = None
     active_through: Optional[int] = None
-    cycles: List[int] = Field(default_factory=list)
-    election_years: List[int] = Field(default_factory=list)
+    cycles: list[int] = Field(default_factory=list)
+    election_years: list[int] = Field(default_factory=list)
     federal_funds_flag: Optional[bool] = None
     has_raised_funds: Optional[bool] = None
     first_file_date: Optional[date] = None
@@ -33,11 +35,11 @@ class CandidateIn(BaseModel):
     @field_validator("name", mode="before")
     @classmethod
     def normalize_name(cls, v: Any) -> str:
-        if not isinstance(v, str) or not v.strip():
+        if not isinstance(v, str):
             return v
-        v = v.strip()
-        if not v:
+        if not v.strip():
             raise ValueError("Name cannot be empty")
+        v = v.strip()
 
         UPPER_SUFFIXES = {
             "II",
@@ -102,3 +104,33 @@ class CandidateIn(BaseModel):
         if v and v.isdigit():
             return v.zfill(2)
         return v
+
+
+class CandidateOut(BaseModel):
+    """Response schema for candidate data."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    candidate_id: str
+    name: str
+    office: Optional[OfficeTypeEnum] = None
+    state: Optional[str] = None
+    party: Optional[str] = None
+    party_full: Optional[str] = None
+    district: Optional[str] = None
+    incumbent_challenge: Optional[str] = None
+    incumbent_challenge_full: Optional[str] = None
+    candidate_status: Optional[str] = None
+    active_through: Optional[int] = None
+    cycles: Optional[list[int]] = None
+    election_years: Optional[list[int]] = None
+    federal_funds_flag: Optional[bool] = None
+    has_raised_funds: Optional[bool] = None
+    first_file_date: Optional[date] = None
+
+
+class CandidateList(BaseModel):
+    items: list[CandidateOut]
+    total_count: int
+    limit: int
+    offset: int
