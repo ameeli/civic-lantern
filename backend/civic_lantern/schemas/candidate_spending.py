@@ -1,7 +1,18 @@
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict
+
+SpendingSortBy = Literal[
+    "cycle",
+    "inside_receipts",
+    "inside_disbursements",
+    "outside_support",
+    "outside_oppose",
+    "outside_total",
+    "influence_ratio",
+    "vulnerability_factor",
+]
 
 
 class CandidateSpendingSchema(BaseModel):
@@ -11,24 +22,14 @@ class CandidateSpendingSchema(BaseModel):
     inside_disbursements: Optional[Decimal] = None
     outside_support: Optional[Decimal] = None
     outside_oppose: Optional[Decimal] = None
+    influence_ratio: Optional[Decimal] = None
+    vulnerability_factor: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-    @computed_field
-    @property
-    def influence_ratio(self) -> Optional[Decimal]:
-        disbursements = self.inside_disbursements or Decimal("0")
-        support = self.outside_support or Decimal("0")
-        oppose = self.outside_oppose or Decimal("0")
-        if disbursements > 0:
-            return round((support + oppose) / disbursements, 2)
-        return None
 
-    @computed_field
-    @property
-    def vulnerability_factor(self) -> Optional[Decimal]:
-        disbursements = self.inside_disbursements or Decimal("0")
-        oppose = self.outside_oppose or Decimal("0")
-        if disbursements > 0:
-            return round(oppose / disbursements, 2)
-        return None
+class CandidateSpendingList(BaseModel):
+    items: list[CandidateSpendingSchema]
+    total_count: int
+    limit: int
+    offset: int

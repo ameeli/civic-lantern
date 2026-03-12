@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from civic_lantern.api.routers import candidate_spending, candidates, election_spending
+from civic_lantern.api.routers import candidates, election_spending
 
 app = FastAPI(
     title="The Civic Lantern",
@@ -18,5 +18,4 @@ app.add_middleware(
 )
 
 app.include_router(candidates.router, prefix="/api/v1")
-app.include_router(candidate_spending.router, prefix="/api/v1")
 app.include_router(election_spending.router, prefix="/api/v1")
