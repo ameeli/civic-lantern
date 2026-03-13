@@ -16,9 +16,7 @@ class CandidateSpendingService(BaseService[CandidateSpendingTotals]):
 
     def _build_base_query(self) -> Any:
         """Return the base SELECT statement with filters applied."""
-        return select(CandidateSpendingTotals).options(
-            joinedload(CandidateSpendingTotals.candidate)
-        )
+        return select(CandidateSpendingTotals)
 
     def _apply_sorting(
         self,
@@ -59,8 +57,9 @@ class CandidateSpendingService(BaseService[CandidateSpendingTotals]):
         count_stmt = select(func.count()).select_from(base_stmt.subquery())
         total_count = (await self.db.execute(count_stmt)).scalar() or 0
 
+        data_stmt = base_stmt.options(joinedload(CandidateSpendingTotals.candidate))
         data_stmt = (
-            self._apply_sorting(base_stmt, sort_by, order).limit(limit).offset(offset)
+            self._apply_sorting(data_stmt, sort_by, order).limit(limit).offset(offset)
         )
         result = await self.db.execute(data_stmt)
 
