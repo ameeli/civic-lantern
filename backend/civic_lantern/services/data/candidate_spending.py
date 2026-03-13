@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,3 +69,17 @@ class CandidateSpendingService(BaseService[CandidateSpendingTotals]):
             "limit": limit,
             "offset": offset,
         }
+
+    async def get_spending_by_candidate_id(
+        self, candidate_id: str
+    ) -> Sequence[CandidateSpendingTotals]:
+        """Fetch all spending records for a specific candidate, ordered by cycle desc."""
+        stmt = (
+            select(CandidateSpendingTotals)
+            .options(joinedload(CandidateSpendingTotals.candidate))
+            .where(CandidateSpendingTotals.candidate_id == candidate_id)
+            .order_by(desc(CandidateSpendingTotals.cycle))
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()

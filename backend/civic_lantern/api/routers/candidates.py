@@ -1,13 +1,9 @@
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from civic_lantern.api.deps import get_db
-from civic_lantern.db.models.candidate import Candidate
-from civic_lantern.db.models.candidate_spending import CandidateSpendingTotals
 from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.schemas.candidate import CandidateList, CandidateOut, CandidateSortBy
 from civic_lantern.schemas.candidate_spending import (
@@ -87,16 +83,11 @@ async def get_candidate_spending(
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch spending totals for a candidate across all cycles."""
-    exists = await db.execute(
-        select(Candidate.candidate_id).where(Candidate.candidate_id == candidate_id)
-    )
-    if not exists.scalar():
+    candidate_svc = CandidateService(db)
+    spending_svc = CandidateSpendingService(db)
+
+    candidate = await candidate_svc.get_by_id(candidate_id)
+    if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
-    result = await db.execute(
-        select(CandidateSpendingTotals)
-        .options(joinedload(CandidateSpendingTotals.candidate))
-        .where(CandidateSpendingTotals.candidate_id == candidate_id)
-        .order_by(CandidateSpendingTotals.cycle)
-    )
-    return result.scalars().all()
+    return await spending_svc.get_spending_by_candidate_id(candidate_id)
