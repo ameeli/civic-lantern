@@ -206,7 +206,11 @@ class TestMergeFecData:
     def test_accumulates_multiple_inside_rows(self, ingestor):
         """Multiple inside rows for the same candidate are summed, not overwritten."""
         inside = [
-            {"candidate_id": "P80001571", "receipts": "3852434.85", "disbursements": "831532.74"},
+            {
+                "candidate_id": "P80001571",
+                "receipts": "3852434.85",
+                "disbursements": "831532.74",
+            },
             {"candidate_id": "P80001571", "receipts": "0.00", "disbursements": "0.00"},
         ]
 
