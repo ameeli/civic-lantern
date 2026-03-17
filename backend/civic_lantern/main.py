@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from civic_lantern.api.routers import candidates, election_spending
+from civic_lantern.utils.logging import configure_logging
+
+configure_logging()
 
 app = FastAPI(
     title="The Civic Lantern",

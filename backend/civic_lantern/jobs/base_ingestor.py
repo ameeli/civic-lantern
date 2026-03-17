@@ -12,8 +12,6 @@ from civic_lantern.services.fec_client import FECClient
 # FEC operates on the US/Eastern filing calendar
 FEC_TIMEZONE = ZoneInfo("America/New_York")
 
-logger = logging.getLogger(__name__)
-
 
 class BaseIngestor(ABC):
     """Base class for FEC data ingestion.

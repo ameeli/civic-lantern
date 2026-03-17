@@ -4,9 +4,6 @@ from typing import Any, Dict, List, Optional
 from civic_lantern.jobs.manager import IngestionManager
 from civic_lantern.utils.logging import configure_logging
 
-# TODO: When you add main.py as part of HTTP server, move this line to that file
-configure_logging()
-
 
 async def ingest(
     start_date: Optional[str] = None,
@@ -32,6 +29,7 @@ async def ingest(
 
 
 if __name__ == "__main__":
+    configure_logging()
     asyncio.run(
         ingest(
             cycle=2024,
