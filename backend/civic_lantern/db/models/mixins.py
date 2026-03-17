@@ -28,7 +28,7 @@ class TimestampMixin:
         """Hook into the end of class declaration to attach triggers."""
 
         trigger_ddl = DDL(f"""
-            CREATE TRIGGER set_updated_at_{cls.__tablename__}
+            CREATE OR REPLACE TRIGGER set_updated_at_{cls.__tablename__}
             BEFORE UPDATE ON {cls.__tablename__}
             FOR EACH ROW EXECUTE FUNCTION set_updated_at();
         """)
