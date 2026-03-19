@@ -1,5 +1,4 @@
 from sqlalchemy import (
-    ARRAY,
     CHAR,
     Boolean,
     Column,
@@ -10,6 +9,7 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
 from civic_lantern.db.models.base import Base, enum_values_callable
