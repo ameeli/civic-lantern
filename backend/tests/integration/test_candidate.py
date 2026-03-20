@@ -1,15 +1,17 @@
 import asyncio
+from datetime import date
 
 import pytest
 from sqlalchemy import select
 
+from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.schemas.candidate import CandidateIn
 from civic_lantern.services.data.candidate import CandidateService
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-class TestCandidateUpsert:
+class TestUpsertBatch:
     async def test_insert_new_candidate(self, async_db):
         """Test that basic insert is successful."""
         service = CandidateService(db=async_db)
@@ -177,3 +179,221 @@ class TestCandidateUpsert:
         )
         all_dups = result.scalars().all()
         assert len(all_dups) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestCandidateGetList:
+    async def test_returns_seeded_rows(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch([CandidateIn(candidate_id="C001", name="Alice")])
+
+        result = await service.get_list(state=None, office=None, cycle=None)
+
+        assert result["total_count"] == 1
+        assert len(result["items"]) == 1
+        assert result["items"][0].candidate_id == "C001"
+
+    async def test_empty_returns_empty(self, async_db):
+        service = CandidateService(db=async_db)
+        result = await service.get_list(state=None, office=None, cycle=None)
+
+        assert result["total_count"] == 0
+        assert len(result["items"]) == 0
+
+    async def test_filter_by_state(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id="C001", name="Alice", state="CA"),
+                CandidateIn(candidate_id="C002", name="Bob", state="TX"),
+                CandidateIn(candidate_id="C003", name="Carol", state="CA"),
+            ]
+        )
+
+        result = await service.get_list(state="CA", office=None, cycle=None)
+
+        assert result["total_count"] == 2
+        ids = {r.candidate_id for r in result["items"]}
+        assert ids == {"C001", "C003"}
+
+    async def test_filter_by_office(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(
+                    candidate_id="C001", name="Alice", office=OfficeTypeEnum.HOUSE
+                ),
+                CandidateIn(
+                    candidate_id="C002", name="Bob", office=OfficeTypeEnum.SENATE
+                ),
+                CandidateIn(
+                    candidate_id="C003", name="Carol", office=OfficeTypeEnum.HOUSE
+                ),
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=OfficeTypeEnum.HOUSE, cycle=None
+        )
+
+        assert result["total_count"] == 2
+        ids = {r.candidate_id for r in result["items"]}
+        assert ids == {"C001", "C003"}
+
+    async def test_filter_by_cycle(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id="C001", name="Alice", cycles=[2020, 2022]),
+                CandidateIn(candidate_id="C002", name="Bob", cycles=[2022, 2024]),
+                CandidateIn(candidate_id="C003", name="Carol", cycles=[2024]),
+            ]
+        )
+
+        result = await service.get_list(state=None, office=None, cycle=2022)
+
+        assert result["total_count"] == 2
+        ids = {r.candidate_id for r in result["items"]}
+        assert ids == {"C001", "C002"}
+
+    async def test_filters_are_combinable(self, async_db):
+        """state + office together narrow results correctly."""
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(
+                    candidate_id="C001",
+                    name="Alice",
+                    state="CA",
+                    office=OfficeTypeEnum.HOUSE,
+                ),
+                CandidateIn(
+                    candidate_id="C002",
+                    name="Bob",
+                    state="CA",
+                    office=OfficeTypeEnum.SENATE,
+                ),
+                CandidateIn(
+                    candidate_id="C003",
+                    name="Carol",
+                    state="TX",
+                    office=OfficeTypeEnum.HOUSE,
+                ),
+            ]
+        )
+
+        result = await service.get_list(
+            state="CA", office=OfficeTypeEnum.HOUSE, cycle=None
+        )
+
+        assert result["total_count"] == 1
+        assert result["items"][0].candidate_id == "C001"
+
+    async def test_pagination_limit_and_offset(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id=f"C{i:03d}", name=f"Candidate {i}")
+                for i in range(5)
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=None, cycle=None, limit=2, offset=0
+        )
+
+        assert result["total_count"] == 5
+        assert len(result["items"]) == 2
+        assert result["limit"] == 2
+        assert result["offset"] == 0
+
+    async def test_total_count_independent_of_limit(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id=f"C{i:03d}", name=f"Candidate {i}")
+                for i in range(5)
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=None, cycle=None, limit=2, offset=2
+        )
+
+        assert result["total_count"] == 5
+        assert len(result["items"]) == 2
+
+    async def test_sort_by_name_asc(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id="C001", name="Charlie"),
+                CandidateIn(candidate_id="C002", name="Alice"),
+                CandidateIn(candidate_id="C003", name="Bob"),
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=None, cycle=None, sort_by="name", order="asc"
+        )
+
+        assert [r.name for r in result["items"]] == ["Alice", "Bob", "Charlie"]
+
+    async def test_sort_by_name_desc(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(candidate_id="C001", name="Charlie"),
+                CandidateIn(candidate_id="C002", name="Alice"),
+                CandidateIn(candidate_id="C003", name="Bob"),
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=None, cycle=None, sort_by="name", order="desc"
+        )
+
+        assert [r.name for r in result["items"]] == ["Charlie", "Bob", "Alice"]
+
+    async def test_sort_by_first_file_date_asc(self, async_db):
+        service = CandidateService(db=async_db)
+        await service.upsert_batch(
+            [
+                CandidateIn(
+                    candidate_id="C001", name="Alice", first_file_date=date(2018, 3, 1)
+                ),
+                CandidateIn(
+                    candidate_id="C002", name="Bob", first_file_date=date(2016, 1, 15)
+                ),
+                CandidateIn(
+                    candidate_id="C003", name="Carol", first_file_date=date(2020, 6, 10)
+                ),
+            ]
+        )
+
+        result = await service.get_list(
+            state=None, office=None, cycle=None, sort_by="first_file_date", order="asc"
+        )
+
+        assert [r.candidate_id for r in result["items"]] == ["C002", "C001", "C003"]
+
+    @pytest.mark.parametrize(
+        "sort_key", ["name", "state", "first_file_date", "last_file_date"]
+    )
+    async def test_all_sort_keys_execute_successfully(self, async_db, sort_key):
+        """
+        Ensures every defined sort key maps to a valid column and
+        executes a query without KeyError or SQL errors.
+        """
+        service = CandidateService(db=async_db)
+
+        result_desc = await service.get_list(
+            state=None, office=None, cycle=None, sort_by=sort_key, order="desc"
+        )
+        result_asc = await service.get_list(
+            state=None, office=None, cycle=None, sort_by=sort_key, order="asc"
+        )
+
+        assert "items" in result_desc
+        assert "items" in result_asc
