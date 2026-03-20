@@ -50,7 +50,6 @@ class BaseService(Generic[T]):
 
             try:
                 inserted, updated = await self._execute_upsert(batch)
-                await self.db.commit()
 
                 stats["inserted"] += inserted
                 stats["updated"] += updated
@@ -72,6 +71,8 @@ class BaseService(Generic[T]):
                 stats["updated"] += batch_stats["updated"]
                 stats["errors"] += batch_stats["error_count"]
                 stats["failed_ids"].extend(batch_stats["failed_ids"])
+
+            await self.db.commit()
 
         logger.info(
             f"Upsert complete. "
@@ -103,7 +104,6 @@ class BaseService(Generic[T]):
                     f"Failed {self.model.__name__} [{row_id}]: {type(e).__name__} - {e}"
                 )
 
-        await self.db.commit()
         return stats
 
     async def _execute_upsert(self, values: List[dict]) -> tuple[int, int]:
