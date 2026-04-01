@@ -5,6 +5,11 @@
   --foreground: #171717;
 }
 
+@theme {
+  --font-masthead: var(--font-masthead);
+  --font-headline: var(--font-headline);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,21 +17,21 @@
   --font-mono: var(--font-geist-mono);
 }
 
+
 @theme {
-  --color-sun-glow: #fffdf2;      
-  --color-sky-top: #fdfaf3;
-  --color-sky-bottom: #cbdce2;
-  --color-sky-corner: #a7c1c9;
+  --color-wood-mid: #6d4c32;
+  --color-lantern-light: rgba(255, 235, 160, 0.4); 
+  --color-lantern-core: rgba(255, 250, 220, 0.7);
 }
 
-@utility bg-sky-sun {
-  background-color: var(--color-sky-top);
+@utility bg-oak-desk {
+  background-color: var(--color-wood-mid);
   background-image: 
-    radial-gradient(circle at 50% 0%, var(--color-sun-glow) 0%, transparent 70%),
-    linear-gradient(to bottom, var(--color-sky-top) 0%, var(--color-sky-bottom) 100%),
-    radial-gradient(circle at 0% 100%, var(--color-sky-corner) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, var(--color-sky-corner) 0%, transparent 50%);
-  filter: saturate(110%) contrast(102%);
+    radial-gradient(circle at 50% 0%, var(--color-lantern-core) 0%, transparent 30%),
+    radial-gradient(circle at 50% 0%, var(--color-lantern-light) 0%, transparent 90%),
+    radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(0, 0, 0, 0.4) 110%),
+    url('/wood-texture.webp');
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,6 +42,5 @@
 }
 
 body {
-  @apply antialiased;
   font-family: Arial, Helvetica, sans-serif;
 }
