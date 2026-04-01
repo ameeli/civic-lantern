@@ -69,7 +69,7 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
             values={`0.07 0 0 0 ${r.toFixed(3)}
                     0.06 0 0 0 ${g.toFixed(3)}
                     0.05 0 0 0 ${b.toFixed(3)}
-                    0    0 0 0.35 0.2`}
+                    0    0 0 1 0.5`}
             in="aging"
             result="agingColor"
           />
@@ -92,7 +92,7 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
             <feFuncR type="linear" slope={0.3} intercept={0.7} />
             <feFuncG type="linear" slope={0.3} intercept={0.7} />
             <feFuncB type="linear" slope={0.3} intercept={0.7} />
-            <feFuncA type="linear" slope={0} intercept={0.7} />
+            <feFuncA type="linear" slope={0} intercept={1} />
           </feComponentTransfer>
           <feBlend
             in="agingColor"
@@ -104,23 +104,15 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
           {/* Foxing spots — threshold turbulence to top ~6% of values */}
           <feTurbulence
             type="turbulence"
-            baseFrequency="0.06"
-            numOctaves="2"
-            seed="21"
+            baseFrequency="0.005"
+            numOctaves="5"
+            seed="30"
             result="spots"
           />
           <feComponentTransfer in="spots" result="spotThresh">
             <feFuncR
               type="discrete"
-              tableValues="0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1"
-            />
-            <feFuncG
-              type="discrete"
-              tableValues="0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1"
-            />
-            <feFuncB
-              type="discrete"
-              tableValues="0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1"
+              tableValues="0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1"
             />
           </feComponentTransfer>
           {/* Promote R channel to alpha to use as compositing mask */}
@@ -133,9 +125,10 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
             in="spotThresh"
             result="spotAlpha"
           />
+
           <feFlood
-            floodColor="#8a6f4a"
-            floodOpacity="0.08"
+            floodColor="#91672c"
+            floodOpacity="0.12"
             result="spotColor"
           />
           <feComposite
