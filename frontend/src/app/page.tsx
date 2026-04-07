@@ -1,4 +1,5 @@
 import Gavel from "@/components/Gavel";
+import MastheadRule from "@/components/MastheadRule";
 import PaperBorder from "@/components/PaperBorder";
 
 export default function Home() {
@@ -8,7 +9,9 @@ export default function Home() {
         <PaperBorder />
         <div className="col-span-6 flex flex-col items-center gap-5">
           <h1 className="text-masthead text-3xl">The Civic Lantern</h1>
-          <Gavel width={40} height={40} />
+          <MastheadRule>
+            <Gavel width={40} height={40} />
+          </MastheadRule>
         </div>
       </main>
     </div>
