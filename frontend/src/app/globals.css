@@ -68,3 +68,18 @@ body {
     /* Depth */
     0px 2px 2px rgba(255, 255, 255, 0.2);
 }
+
+@utility ink-press {
+  color: var(--color-ink);
+  opacity: 0.85;
+  filter:
+    blur(0.5px)
+    contrast(120%)
+    drop-shadow(0.8px 0.8px 0px rgba(44, 40, 37, 0.8))
+    /* Bleed */
+    drop-shadow(0px 0px 3px rgba(44, 40, 37, 0.5))
+    /* Halo */
+    drop-shadow(0px 3px 6px rgba(44, 40, 37, 0.2))
+    /* Depth */
+    drop-shadow(0px 2px 2px rgba(255, 255, 255, 0.2));
+}
