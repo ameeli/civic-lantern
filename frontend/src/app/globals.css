@@ -7,7 +7,10 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Brand Colors */
+  /* Text Colors */
+  --color-ink: #2c2825;
+
+  /* Background Colors */
   --color-wood-mid: #6d4c32;
   --color-lantern-light: rgba(255, 235, 160, 0.4); 
   --color-lantern-core: rgba(255, 250, 220, 0.7);
@@ -53,7 +56,7 @@ body {
   transform-origin: top;
   line-height: 0.8;  
 
-  color: #2c2825;
+  color: var(--color-ink);
   opacity: 0.85; 
   filter: blur(0.3px) contrast(120%);
   text-shadow:
