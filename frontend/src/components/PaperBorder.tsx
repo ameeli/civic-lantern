@@ -15,7 +15,7 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
       width="100%"
       height="100%"
       aria-hidden="true"
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0 pointer-events-none -z-10"
     >
       <defs>
         {/* Edge warp */}
