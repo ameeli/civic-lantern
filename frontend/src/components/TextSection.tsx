@@ -6,8 +6,8 @@ export default function TextSection({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <h3 className="font-headline font-medium italic">{heading}</h3>
+    <section className="space-y-2">
+      <h3 className="font-headline font-medium italic text-center">{heading}</h3>
       <p className="text-body-justify">{children}</p>
     </section>
   );
