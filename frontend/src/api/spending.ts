@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { apiFetch } from "./client";
 
 interface ElectionSpending {
@@ -14,6 +15,6 @@ export function getElectionSpendings() {
   return apiFetch<ElectionSpending[]>("/elections/spending");
 }
 
-export function getElectionSpending(cycle: number) {
+export const getElectionSpending = cache((cycle: number) => {
   return apiFetch<ElectionSpending>(`/elections/spending/${cycle}`);
-}
+});
