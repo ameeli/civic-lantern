@@ -76,5 +76,5 @@ body {
 @utility text-body-justify {
   text-align: justify;
   font-size: 0.8rem;
-  line-height: 1;
+  line-height: 1.15;
 }
