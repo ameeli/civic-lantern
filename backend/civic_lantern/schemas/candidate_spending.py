@@ -1,4 +1,3 @@
-from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -30,29 +29,28 @@ class CandidateInfo(BaseModel):
 class CandidateSpendingSchema(BaseModel):
     candidate_id: str
     cycle: int
-    inside_receipts: Optional[Decimal] = None
-    inside_disbursements: Optional[Decimal] = None
-    outside_support: Optional[Decimal] = None
-    outside_oppose: Optional[Decimal] = None
-    influence_ratio: Optional[Decimal] = None
-    vulnerability_factor: Optional[Decimal] = None
+    inside_receipts: Optional[float] = None
+    inside_disbursements: Optional[float] = None
+    outside_support: Optional[float] = None
+    outside_oppose: Optional[float] = None
+    influence_ratio: Optional[float] = None
+    vulnerability_factor: Optional[float] = None
     candidate: Optional[CandidateInfo] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-    @model_validator(mode='after')
-    def _compute_ratios(self) -> 'CandidateSpendingSchema':
+    @model_validator(mode="after")
+    def _compute_ratios(self) -> "CandidateSpendingSchema":
         """Compute influence_ratio and vulnerability_factor from spending data."""
         denom = self.inside_disbursements
         if not denom:
             self.influence_ratio = None
             self.vulnerability_factor = None
             return self
-        support = self.outside_support or Decimal(0)
-        oppose = self.outside_oppose or Decimal(0)
-        two_dp = Decimal("0.01")
-        self.influence_ratio = ((support + oppose) / denom).quantize(two_dp, rounding=ROUND_HALF_UP)
-        self.vulnerability_factor = (oppose / denom).quantize(two_dp, rounding=ROUND_HALF_UP)
+        support = self.outside_support or 0.0
+        oppose = self.outside_oppose or 0.0
+        self.influence_ratio = round((support + oppose) / denom, 2)
+        self.vulnerability_factor = round(oppose / denom, 2)
         return self
 
 

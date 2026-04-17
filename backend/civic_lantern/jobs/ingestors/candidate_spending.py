@@ -1,6 +1,5 @@
 import asyncio
 from collections import defaultdict
-from decimal import Decimal
 from typing import Any, Dict, List
 
 from pydantic import ValidationError
@@ -58,10 +57,10 @@ class SpendingIngestor(BaseIngestor):
         merged = defaultdict(
             lambda: {
                 "cycle": cycle,
-                "inside_receipts": Decimal(0),
-                "inside_disbursements": Decimal(0),
-                "outside_support": Decimal(0),
-                "outside_oppose": Decimal(0),
+                "inside_receipts": 0.0,
+                "inside_disbursements": 0.0,
+                "outside_support": 0.0,
+                "outside_oppose": 0.0,
             }
         )
 
@@ -69,9 +68,9 @@ class SpendingIngestor(BaseIngestor):
         for item in inside:
             cid = item["candidate_id"]
             merged[cid]["candidate_id"] = cid
-            merged[cid]["inside_receipts"] += Decimal(str(item.get("receipts") or 0))
-            merged[cid]["inside_disbursements"] += Decimal(
-                str(item.get("disbursements") or 0)
+            merged[cid]["inside_receipts"] += float(item.get("receipts") or 0)
+            merged[cid]["inside_disbursements"] += float(
+                item.get("disbursements") or 0
             )
 
         # 2. Map Outside Spending (Handling S/O indicator rows)
@@ -80,7 +79,7 @@ class SpendingIngestor(BaseIngestor):
             merged[cid]["candidate_id"] = cid
 
             indicator = item.get("support_oppose_indicator")
-            amount = Decimal(str(item.get("total") or 0))
+            amount = float(item.get("total") or 0)
 
             if indicator == "S":
                 merged[cid]["outside_support"] += amount

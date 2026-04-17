@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 import pytest
 
 from civic_lantern.schemas.candidate_spending import CandidateSpendingSchema
@@ -33,13 +31,13 @@ class TestCandidateSpendingSchema:
         schema = CandidateSpendingSchema(
             candidate_id="P00003392",
             cycle=2024,
-            inside_disbursements=inside,  # Pydantic converts strings to Decimal
+            inside_disbursements=inside,  # Pydantic converts strings to float
             outside_support=support,
             outside_oppose=oppose,
         )
 
-        expected_r = Decimal(expected_ratio) if expected_ratio is not None else None
-        expected_v = Decimal(expected_vuln) if expected_vuln is not None else None
+        expected_r = float(expected_ratio) if expected_ratio is not None else None
+        expected_v = float(expected_vuln) if expected_vuln is not None else None
         assert schema.influence_ratio == expected_r
         assert schema.vulnerability_factor == expected_v
 
@@ -55,4 +53,4 @@ class TestCandidateSpendingSchema:
         schema = CandidateSpendingSchema(
             candidate_id="TEST", cycle=2024, inside_receipts="500.75"
         )
-        assert schema.inside_receipts == Decimal("500.75")
+        assert schema.inside_receipts == 500.75

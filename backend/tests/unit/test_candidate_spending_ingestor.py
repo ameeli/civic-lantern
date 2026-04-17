@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 import pytest
 
 from civic_lantern.jobs.ingestors.candidate_spending import SpendingIngestor
@@ -83,10 +81,10 @@ class TestMergeFecData:
         assert len(result) == 1
         row = result[0]
         assert row["candidate_id"] == "H1TX00001"
-        assert row["inside_receipts"] == Decimal("1000.00")
-        assert row["inside_disbursements"] == Decimal("800.00")
-        assert row["outside_support"] == Decimal(0)
-        assert row["outside_oppose"] == Decimal(0)
+        assert row["inside_receipts"] == 1000.0
+        assert row["inside_disbursements"] == 800.0
+        assert row["outside_support"] == 0.0
+        assert row["outside_oppose"] == 0.0
 
     def test_outside_only_candidate(self, ingestor):
         """Candidate appearing only in outside data gets zero inside values."""
@@ -102,9 +100,9 @@ class TestMergeFecData:
 
         assert len(result) == 1
         row = result[0]
-        assert row["outside_support"] == Decimal("5000.00")
-        assert row["inside_receipts"] == Decimal(0)
-        assert row["inside_disbursements"] == Decimal(0)
+        assert row["outside_support"] == 5000.0
+        assert row["inside_receipts"] == 0.0
+        assert row["inside_disbursements"] == 0.0
 
     def test_support_and_oppose_split_correctly(self, ingestor):
         """S and O indicators map to separate outside_support and outside_oppose fields."""
@@ -124,8 +122,8 @@ class TestMergeFecData:
         result = ingestor._merge_fec_data(2024, [], outside)
 
         row = result[0]
-        assert row["outside_support"] == Decimal("3000.00")
-        assert row["outside_oppose"] == Decimal("1500.00")
+        assert row["outside_support"] == 3000.0
+        assert row["outside_oppose"] == 1500.0
 
     def test_accumulates_multiple_outside_rows(self, ingestor):
         """Multiple S rows for the same candidate are summed, not overwritten."""
@@ -144,7 +142,7 @@ class TestMergeFecData:
 
         result = ingestor._merge_fec_data(2024, [], outside)
 
-        assert result[0]["outside_support"] == Decimal("3000.00")
+        assert result[0]["outside_support"] == 3000.0
 
     def test_unknown_indicator_is_ignored(self, ingestor):
         """Outside rows with unrecognised indicator don't modify any outside field."""
@@ -158,8 +156,8 @@ class TestMergeFecData:
 
         result = ingestor._merge_fec_data(2024, [], outside)
 
-        assert result[0]["outside_support"] == Decimal(0)
-        assert result[0]["outside_oppose"] == Decimal(0)
+        assert result[0]["outside_support"] == 0.0
+        assert result[0]["outside_oppose"] == 0.0
 
     def test_null_amounts_default_to_zero(self, ingestor):
         """None receipts/disbursements/total are treated as zero without crashing."""
@@ -177,9 +175,9 @@ class TestMergeFecData:
         result = ingestor._merge_fec_data(2024, inside, outside)
 
         row = result[0]
-        assert row["inside_receipts"] == Decimal(0)
-        assert row["inside_disbursements"] == Decimal(0)
-        assert row["outside_support"] == Decimal(0)
+        assert row["inside_receipts"] == 0.0
+        assert row["inside_disbursements"] == 0.0
+        assert row["outside_support"] == 0.0
 
     def test_cycle_is_set_on_every_row(self, ingestor):
         """The cycle value is attached to every merged row."""
@@ -217,8 +215,8 @@ class TestMergeFecData:
         result = ingestor._merge_fec_data(2024, inside, [])
 
         assert len(result) == 1
-        assert result[0]["inside_receipts"] == Decimal("3852434.85")
-        assert result[0]["inside_disbursements"] == Decimal("831532.74")
+        assert result[0]["inside_receipts"] == 3852434.85
+        assert result[0]["inside_disbursements"] == 831532.74
 
     def test_empty_inputs_return_empty(self, ingestor):
         """Both empty inside and outside yields an empty result."""
@@ -246,10 +244,10 @@ class TestMergeFecData:
 
         assert len(result) == 1
         row = result[0]
-        assert row["inside_receipts"] == Decimal("500")
-        assert row["inside_disbursements"] == Decimal("400")
-        assert row["outside_support"] == Decimal("200")
-        assert row["outside_oppose"] == Decimal("100")
+        assert row["inside_receipts"] == 500.0
+        assert row["inside_disbursements"] == 400.0
+        assert row["outside_support"] == 200.0
+        assert row["outside_oppose"] == 100.0
 
 
 # ---------------------------------------------------------------------------
@@ -296,10 +294,10 @@ class TestSpendingIngestorTransform:
                 {
                     "candidate_id": "H1TX00001",
                     "cycle": 2024,
-                    "inside_receipts": Decimal("100"),
-                    "inside_disbursements": Decimal("80"),
-                    "outside_support": Decimal(0),
-                    "outside_oppose": Decimal(0),
+                    "inside_receipts": 100.0,
+                    "inside_disbursements": 80.0,
+                    "outside_support": 0.0,
+                    "outside_oppose": 0.0,
                 },
                 {"cycle": 2024},  # missing required candidate_id
             ],
@@ -348,8 +346,8 @@ class TestSpendingIngestorTransform:
         result = ingestor.transform(raw)
 
         schema = result[0]
-        assert schema.influence_ratio == Decimal("2.00")
-        assert schema.vulnerability_factor == Decimal("1.00")
+        assert schema.influence_ratio == 2.0
+        assert schema.vulnerability_factor == 1.0
 
 
 # ---------------------------------------------------------------------------
