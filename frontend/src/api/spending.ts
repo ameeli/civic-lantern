@@ -11,10 +11,12 @@ interface ElectionSpending {
   global_influence_ratio: number | null;
 }
 
-export function getElectionSpendings() {
+export const listElectionSpending = () => {
   return apiFetch<ElectionSpending[]>("/election-spending");
-}
+};
 
-export const getElectionSpending = cache((cycle: number) => {
+export const getElectionSpendingByCycle = cache((cycle: number) => {
   return apiFetch<ElectionSpending>(`/election-spending/${cycle}`);
 });
+
+export const getCandidatesSpendings = () => {};

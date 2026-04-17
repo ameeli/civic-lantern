@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getElectionSpending } from "@/api/spending";
+import { getElectionSpendingByCycle } from "@/api/spending";
 
 function formatDollars(value: number | null): string {
   if (value === null) return "N/A";
@@ -11,7 +11,7 @@ function formatDollars(value: number | null): string {
 }
 
 async function InsideDisbursements({ cycle }: { cycle: number }) {
-  const spending = await getElectionSpending(cycle);
+  const spending = await getElectionSpendingByCycle(cycle);
   return (
     <h3 className="text-2xl font-medium text-center">
       {formatDollars(spending.total_inside_disbursements)}
@@ -20,7 +20,7 @@ async function InsideDisbursements({ cycle }: { cycle: number }) {
 }
 
 async function OutsideTotal({ cycle }: { cycle: number }) {
-  const spending = await getElectionSpending(cycle);
+  const spending = await getElectionSpendingByCycle(cycle);
   const total =
     (spending.total_outside_support ?? 0) +
     (spending.total_outside_oppose ?? 0);
