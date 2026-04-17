@@ -87,8 +87,8 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
           <br />
           While the groups are legally barred from coordinating with campaigns,
           they often operate in ways that closely mirror them, funding
-          aggressive ads and large scale outreach. This allows massive,
-          unregulated wealth to shape elections from the outside.
+          aggressive ads and outreach. This allows massive, unregulated wealth
+          to shape elections from the outside.
         </SpendingCategory>
       </div>
     </div>

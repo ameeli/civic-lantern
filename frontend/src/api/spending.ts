@@ -12,9 +12,9 @@ interface ElectionSpending {
 }
 
 export function getElectionSpendings() {
-  return apiFetch<ElectionSpending[]>("/elections/spending");
+  return apiFetch<ElectionSpending[]>("/election-spending");
 }
 
 export const getElectionSpending = cache((cycle: number) => {
-  return apiFetch<ElectionSpending>(`/elections/spending/${cycle}`);
+  return apiFetch<ElectionSpending>(`/election-spending/${cycle}`);
 });

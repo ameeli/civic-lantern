@@ -5,20 +5,12 @@ from civic_lantern.db.models.election_spending import MvElectionSpendingSummary
 from civic_lantern.main import app
 from tests.unit.conftest import scalars_all_result, scalars_first_result
 
-# ---------------------------------------------------------------------------
-# Route URL helpers
-# ---------------------------------------------------------------------------
-
 ELECTION_SPENDING_URL = str(app.url_path_for("get_election_spending"))
 
 
 def election_spending_by_cycle_url(cycle: int) -> str:
     return str(app.url_path_for("get_election_spending_by_cycle", cycle=cycle))
 
-
-# ---------------------------------------------------------------------------
-# Shared data
-# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def spending_obj():
@@ -31,11 +23,6 @@ def spending_obj():
         total_outside_oppose=None,
         global_influence_ratio=None,
     )
-
-
-# ---------------------------------------------------------------------------
-# GET /elections/spending
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -54,11 +41,6 @@ class TestGetElectionSpending:
         response = await api_client.get(ELECTION_SPENDING_URL)
         assert response.status_code == 200
         assert response.json() == []
-
-
-# ---------------------------------------------------------------------------
-# GET /elections/spending/{cycle}
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
@@ -87,4 +69,3 @@ class TestGetElectionSpendingByCycle:
     async def test_cycle_above_max_returns_422(self, api_client, mock_session):
         response = await api_client.get(election_spending_by_cycle_url(_MAX_CYCLE + 2))
         assert response.status_code == 422
-

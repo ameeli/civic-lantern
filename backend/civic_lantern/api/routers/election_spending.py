@@ -7,7 +7,7 @@ from civic_lantern.api.deps import get_db
 from civic_lantern.schemas.election_spending import ElectionSpending
 from civic_lantern.services.data.election_spending import ElectionSpendingService
 
-router = APIRouter(prefix="/elections", tags=["election_spending"])
+router = APIRouter(prefix="/election-spending", tags=["election_spending"])
 
 _current_year = date.today().year
 _MAX_CYCLE = _current_year if _current_year % 2 == 0 else _current_year - 1
@@ -23,7 +23,7 @@ def validate_even_cycle(cycle: int = Path(..., ge=1980, le=_MAX_CYCLE)) -> int:
     return cycle
 
 
-@router.get("/spending", response_model=list[ElectionSpending])
+@router.get("", response_model=list[ElectionSpending])
 async def get_election_spending(
     db: AsyncSession = Depends(get_db),
 ) -> list[ElectionSpending]:
@@ -32,7 +32,7 @@ async def get_election_spending(
     return await service.get_all_spending()
 
 
-@router.get("/spending/{cycle}", response_model=ElectionSpending)
+@router.get("/{cycle}", response_model=ElectionSpending)
 async def get_election_spending_by_cycle(
     cycle: int = Depends(validate_even_cycle),
     db: AsyncSession = Depends(get_db),
