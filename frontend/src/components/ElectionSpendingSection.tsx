@@ -55,7 +55,7 @@ function SpendingCategory({
 
 export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
   return (
-    <div className="col-span-3 space-y-3 px-2">
+    <div className="col-span-12 sm:col-span-6 lg:col-span-3 space-y-3 px-2">
       <h1 className="font-headline font-semibold text-2xl text-center">
         ELECTION SPENDING
       </h1>
