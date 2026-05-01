@@ -154,7 +154,7 @@ class FECClient:
         params = {
             "api_key": self.api_key,
             "cycle": cycle,
-            "election_full": "true",
+            "election_full": "false",
             "per_page": per_page,
             **kwargs,
         }
