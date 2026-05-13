@@ -16,11 +16,9 @@ Campaign finance data is public, but the FEC's raw data is enormous, inconsisten
 
 ```
 civic-lantern/
-├── backend/        # FastAPI + PostgreSQL (active)
-└── frontend/       # Planned UI (not yet implemented)
+├── backend/        # FastAPI + PostgreSQL data pipeline and REST API
+└── frontend/       # Next.js UI — election spending dashboard
 ```
-
-The backend is the current focus. It is a standalone API server that can be consumed by any frontend or data analysis tool.
 
 ### Backend Stack
 
@@ -36,9 +34,29 @@ The backend is the current focus. It is a standalone API server that can be cons
 | Retry logic | tenacity |
 | Package manager | Poetry |
 
+### Frontend Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript 5 |
+| UI library | React 19 |
+| Styling | Tailwind CSS 4 |
+| Build tool | Next.js Turbo |
+| Package manager | npm |
+
 ---
 
 ## Key Features
+
+### Election Spending Dashboard
+
+The frontend surfaces campaign finance data as a readable, newspaper-style UI. For a given election cycle it displays:
+
+- **Direct Campaign Spending** — total official candidate disbursements (inside money), with plain-language context explaining donation limits and candidate accountability
+- **Independent Expenditures** — total outside spending from Super PACs and dark money groups (support + oppose combined), with context on the absence of contribution caps
+
+Data is fetched server-side via Next.js React Server Components and streamed to the client using `<Suspense>` boundaries, so each metric loads independently without blocking the page.
 
 ### Resilient Data Ingestion Pipeline
 
@@ -91,11 +109,12 @@ Interactive docs available at `/docs` (Swagger UI) when the server is running.
 ### Prerequisites
 
 - Python 3.11+
+- Node.js 20+
 - [Poetry](https://python-poetry.org/)
 - Docker (for PostgreSQL)
 - An [FEC API key](https://api.data.gov/signup/) (free)
 
-### Steps
+### Backend
 
 ```bash
 # 1. Clone the repo
@@ -126,6 +145,20 @@ The API will be available at `http://localhost:8000`. Visit `http://localhost:80
 ```bash
 poetry run python -m civic_lantern.jobs.ingestion
 ```
+
+### Frontend
+
+```bash
+cd civic-lantern/frontend
+
+# Install dependencies
+npm install
+
+# Start the dev server
+npm run dev
+```
+
+The UI will be available at `http://localhost:3000`. It expects the backend API to be running at `http://localhost:8000`.
 
 ---
 
@@ -160,7 +193,7 @@ The core tables:
 
 ## Project Status
 
-The backend data pipeline and REST API are functional. The frontend is planned but not yet started. Current development is focused on expanding ingestion coverage and adding deeper analytical endpoints.
+The backend data pipeline and REST API are functional. The frontend is live with an election spending dashboard for the 2024 cycle. Current development is focused on expanding ingestion coverage, adding deeper analytical endpoints, and building out additional frontend views.
 
 ---
 
