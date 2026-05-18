@@ -31,6 +31,10 @@ class FECClient:
     def __init__(self):
         self.base_url = self.BASE_URL
         self.candidate_url = f"{self.base_url}/candidates/"
+        self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
+        self.outside_spending_url = (
+            f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
+        )
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
@@ -150,7 +154,7 @@ class FECClient:
         self, cycle: int = 2024, per_page: int = 100, **kwargs
     ) -> list[dict]:
         """Fetch inside spending totals for candidates."""
-        url = f"{self.base_url}/candidates/totals/"
+        url = self.candidate_totals_url
         params = {
             "api_key": self.api_key,
             "cycle": cycle,
@@ -167,7 +171,7 @@ class FECClient:
         self, cycle: int = 2024, per_page: int = 100, **kwargs
     ) -> list[dict]:
         """Fetch independent expenditures aggregated by candidate."""
-        url = f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
+        url = self.outside_spending_url
         params = {
             "api_key": self.api_key,
             "cycle": cycle,
