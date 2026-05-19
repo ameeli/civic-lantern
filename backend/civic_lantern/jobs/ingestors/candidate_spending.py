@@ -18,8 +18,7 @@ class SpendingIngestor(BaseIngestor):
     entity_name = "candidate_spending"
 
     async def fetch(self, cycle: int = 2024, **kwargs: Any) -> Dict[str, Any]:
-        """Fetches Inside and Outside totals concurrently."""
-
+        """Fetches Inside and Outside totals concurrently for the full cycle."""
         inside_task = self.client.get_candidate_totals(cycle=cycle)
         outside_task = self.client.get_outside_spending_totals(cycle=cycle)
 

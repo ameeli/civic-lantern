@@ -69,7 +69,7 @@ class TestBaseIngestorWorkflow:
         assert result is None
 
     async def test_default_date_range_uses_eastern(self, mocker, mock_client, mock_session):
-        """When no dates provided, defaults to last 7 days in US/Eastern."""
+        """When no dates provided, defaults to last 1 day in US/Eastern."""
         fec_tz = ZoneInfo("America/New_York")
         fake_now = datetime(2025, 6, 15, 10, 0, tzinfo=fec_tz)
         mock_dt = mocker.patch("civic_lantern.jobs.base_ingestor.datetime")
@@ -83,7 +83,7 @@ class TestBaseIngestorWorkflow:
 
         start, end = ingestor._resolve_dates(None, None)
 
-        assert start == "2025-06-08"
+        assert start == "2025-06-14"
         assert end == "2025-06-15"
         # Verify now() was called with US/Eastern timezone
         mock_dt.now.assert_called_once_with(fec_tz)

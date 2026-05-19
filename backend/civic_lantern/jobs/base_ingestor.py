@@ -83,7 +83,7 @@ class BaseIngestor(ABC):
         """Default to last 7 days in US/Eastern (FEC filing calendar)."""
         now_et = datetime.now(FEC_TIMEZONE)
         if not start_date:
-            start_date = (now_et - timedelta(days=7)).strftime("%Y-%m-%d")
+            start_date = (now_et - timedelta(days=1)).strftime("%Y-%m-%d")
         if not end_date:
             end_date = now_et.strftime("%Y-%m-%d")
         return start_date, end_date
