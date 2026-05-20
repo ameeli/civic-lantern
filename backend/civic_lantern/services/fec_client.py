@@ -139,10 +139,15 @@ class FECClient:
                 logger.warning(f"Page {page} failed: {e}")
                 return e
 
-    async def get_candidates(self, per_page: int = 100, **kwargs) -> list[dict]:
+    FEDERAL_OFFICES = ["P", "S", "H"]
+
+    async def get_candidates(
+        self, per_page: int = 100, office: list[str] = FEDERAL_OFFICES, **kwargs
+    ) -> list[dict]:
         params = {
             "api_key": self.api_key,
             "per_page": per_page,
+            "office": office,
         }
         params.update(kwargs)
 
@@ -151,35 +156,43 @@ class FECClient:
         return candidates
 
     async def get_candidate_totals(
-        self, cycle: int = 2024, per_page: int = 100, **kwargs
+        self,
+        cycle: int = 2024,
+        per_page: int = 100,
+        office: list[str] = FEDERAL_OFFICES,
+        **kwargs,
     ) -> list[dict]:
         """Fetch inside spending totals for candidates."""
-        url = self.candidate_totals_url
         params = {
             "api_key": self.api_key,
             "cycle": cycle,
             "election_full": "false",
             "per_page": per_page,
+            "office": office,
             **kwargs,
         }
 
-        totals = await self._paginate(url, params)
+        totals = await self._paginate(self.candidate_totals_url, params)
         logger.info(f"✅ Fetched {len(totals)} inside candidate totals")
         return totals
 
     async def get_outside_spending_totals(
-        self, cycle: int = 2024, per_page: int = 100, **kwargs
+        self,
+        cycle: int = 2024,
+        per_page: int = 100,
+        office: list[str] = FEDERAL_OFFICES,
+        **kwargs,
     ) -> list[dict]:
         """Fetch independent expenditures aggregated by candidate."""
-        url = self.outside_spending_url
         params = {
             "api_key": self.api_key,
             "cycle": cycle,
             "per_page": per_page,
+            "office": office,
             **kwargs,
         }
 
-        totals = await self._paginate(url, params)
+        totals = await self._paginate(self.outside_spending_url, params)
         logger.info(f"✅ Fetched {len(totals)} outside spending records")
         return totals
 
