@@ -24,6 +24,7 @@ class Committee(Base, TimestampMixin):
         ),
         nullable=False,
     )
+    committee_type_full = Column(String)
 
     cycles = Column(ARRAY(Integer))
     designation = Column(CHAR(1))

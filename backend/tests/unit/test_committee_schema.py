@@ -42,7 +42,33 @@ class TestCommitteeIn:
         result = CommitteeIn.model_validate(VALID_COMMITTEE)
         assert result.designation is None
         assert result.affiliated_committee_name is None
+        assert result.committee_type_full is None
         assert result.treasurer_name is None
+
+    def test_committee_type_full_stored(self):
+        raw = {**VALID_COMMITTEE, "committee_type_full": "PAC - Qualified"}
+        result = CommitteeIn.model_validate(raw)
+        assert result.committee_type_full == "PAC - Qualified"
+
+    def test_affiliated_committee_name_none_string_normalized(self):
+        raw = {**VALID_COMMITTEE, "affiliated_committee_name": "NONE"}
+        result = CommitteeIn.model_validate(raw)
+        assert result.affiliated_committee_name is None
+
+    @pytest.mark.parametrize(
+        "raw_value",
+        ["NONE", "none", " NONE ", "None"],
+        ids=["upper", "lower", "padded", "mixed"],
+    )
+    def test_affiliated_committee_name_none_variants(self, raw_value):
+        raw = {**VALID_COMMITTEE, "affiliated_committee_name": raw_value}
+        result = CommitteeIn.model_validate(raw)
+        assert result.affiliated_committee_name is None
+
+    def test_affiliated_committee_name_real_value_preserved(self):
+        raw = {**VALID_COMMITTEE, "affiliated_committee_name": "DNC SERVICES CORP"}
+        result = CommitteeIn.model_validate(raw)
+        assert result.affiliated_committee_name == "DNC SERVICES CORP"
 
     def test_list_fields_default_to_empty(self):
         raw = {

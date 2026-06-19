@@ -10,6 +10,7 @@ class CommitteeIn(BaseModel):
     committee_id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
     committee_type: CommitteeTypeEnum
+    committee_type_full: Optional[str] = None
 
     affiliated_committee_name: Optional[str] = None
     candidate_ids: list[str] = Field(default_factory=list)
@@ -39,4 +40,11 @@ class CommitteeIn(BaseModel):
     def normalize_committee_type(cls, v: Any) -> Any:
         if isinstance(v, str):
             return v.upper()
+        return v
+
+    @field_validator("affiliated_committee_name", mode="before")
+    @classmethod
+    def normalize_affiliated_committee_name(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.strip().upper() == "NONE":
+            return None
         return v
