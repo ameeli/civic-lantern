@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import ElectionSpendingSection from "@/components/ElectionSpendingSection";
 import Gavel from "@/components/Gavel";
 import MastheadRule from "@/components/MastheadRule";
