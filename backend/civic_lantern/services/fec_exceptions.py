@@ -8,9 +8,14 @@ class FECAPIError(Exception):
 
 
 class FECRateLimitError(FECAPIError):
-    """Raised when FEC API rate limit is exceeded."""
+    """Raised when FEC API rate limit is exceeded.
 
-    retryable = True
+    Not retried — the minute_limiter in FECClient should prevent 429s entirely.
+    If one does occur, retrying immediately with a short backoff won't help since
+    the per-minute window hasn't reset.
+    """
+
+    retryable = False
 
 
 class FECNotFoundError(FECAPIError):

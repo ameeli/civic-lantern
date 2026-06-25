@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, AsyncMock, Mock
 
 import httpx
 import pytest
@@ -48,20 +48,21 @@ class TestFECClientErrorHandling:
         assert exc_info.value.retryable is True
 
     async def test_get_candidates_raises_rate_limit_error(self, client, mocker):
-        """Public method should bubble up the correct custom exception."""
-        mocker.patch("asyncio.sleep")
+        """429 raises FECRateLimitError immediately — not retried."""
         mock_response = Mock()
         mock_response.status_code = 429
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Too Many Requests", request=Mock(), response=mock_response
         )
-        mocker.patch(
+        mock_get = mocker.patch(
             "civic_lantern.services.fec_client.httpx.AsyncClient.get",
             return_value=mock_response,
         )
 
         with pytest.raises(FECRateLimitError):
             await client.get_candidates(election_year=2024)
+
+        assert mock_get.call_count == 1
 
     @respx.mock
     async def test_fetch_retries_on_500_error(self, client, mocker):
@@ -123,6 +124,31 @@ class TestFECClientErrorHandling:
             await client.get_candidates(election_year=2024)
 
         assert exc_info.value.retryable is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestFECClientRateLimiting:
+    """Test that both rate limiters are acquired on every request."""
+
+    @respx.mock
+    async def test_both_limiters_acquired_per_request(self, client):
+        """Every _fetch_page call must acquire both the hourly and per-minute limiter."""
+        respx.get(url__startswith=client.candidate_url).mock(
+            return_value=httpx.Response(
+                200,
+                json={"results": [{"candidate_id": "C001"}], "pagination": {"pages": 1}},
+            )
+        )
+        mock_hourly = AsyncMock()
+        mock_minute = AsyncMock()
+        client.limiter = mock_hourly
+        client.minute_limiter = mock_minute
+
+        await client.get_candidates(election_year=2024)
+
+        mock_hourly.__aenter__.assert_awaited_once()
+        mock_minute.__aenter__.assert_awaited_once()
 
 
 @pytest.mark.unit
