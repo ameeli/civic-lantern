@@ -9,7 +9,7 @@ from civic_lantern.db.models.enums import CommitteeTypeEnum
 class CommitteeIn(BaseModel):
     committee_id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
-    committee_type: CommitteeTypeEnum
+    committee_type: Optional[CommitteeTypeEnum] = None
     committee_type_full: Optional[str] = None
 
     affiliated_committee_name: Optional[str] = None

@@ -23,11 +23,17 @@ class TestCommitteeIn:
         with pytest.raises(ValidationError):
             CommitteeIn.model_validate({"committee_type": "Q"})
 
-    def test_missing_committee_type(self):
-        with pytest.raises(ValidationError):
-            CommitteeIn.model_validate(
-                {"committee_id": "C00000422", "name": "Test PAC"}
-            )
+    def test_null_committee_type_accepted(self):
+        result = CommitteeIn.model_validate(
+            {"committee_id": "C00000422", "name": "Test PAC", "committee_type": None}
+        )
+        assert result.committee_type is None
+
+    def test_absent_committee_type_defaults_to_none(self):
+        result = CommitteeIn.model_validate(
+            {"committee_id": "C00000422", "name": "Test PAC"}
+        )
+        assert result.committee_type is None
 
     def test_committee_type_normalization(self):
         raw = {**VALID_COMMITTEE, "committee_type": "o"}

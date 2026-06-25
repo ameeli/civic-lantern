@@ -22,7 +22,6 @@ class Committee(Base, TimestampMixin):
             name="committee_type_enum",
             values_callable=enum_values_callable,
         ),
-        nullable=False,
     )
     committee_type_full = Column(String)
 
