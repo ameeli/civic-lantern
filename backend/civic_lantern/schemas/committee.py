@@ -15,6 +15,11 @@ class CommitteeIn(BaseModel):
     affiliated_committee_name: Optional[str] = None
     candidate_ids: list[str] = Field(default_factory=list)
     sponsor_candidate_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("candidate_ids", "sponsor_candidate_ids", mode="before")
+    @classmethod
+    def coerce_null_to_empty_list(cls, v: Any) -> Any:
+        return v if v is not None else []
     cycles: list[int] = Field(default_factory=list)
 
     designation: Optional[str] = None

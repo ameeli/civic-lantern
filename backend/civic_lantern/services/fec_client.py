@@ -32,6 +32,7 @@ class FECClient:
         self.base_url = self.BASE_URL
         self.candidate_url = f"{self.base_url}/candidates/"
         self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
+        self.committee_url = f"{self.base_url}/committees/"
         self.outside_spending_url = (
             f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
         )
@@ -154,6 +155,17 @@ class FECClient:
         candidates = await self._paginate(self.candidate_url, params)
         logger.info(f"✅ Fetched {len(candidates)} candidates")
         return candidates
+
+    async def get_committees(self, per_page: int = 100, **kwargs) -> list[dict]:
+        params = {
+            "api_key": self.api_key,
+            "per_page": per_page,
+        }
+        params.update(kwargs)
+
+        committees = await self._paginate(self.committee_url, params)
+        logger.info(f"✅ Fetched {len(committees)} committees")
+        return committees
 
     async def get_candidate_totals(
         self,

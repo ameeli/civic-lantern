@@ -81,6 +81,16 @@ class TestCommitteeIn:
         assert result.sponsor_candidate_ids == []
         assert result.cycles == []
 
+    def test_null_list_fields_coerced_to_empty(self):
+        raw = {
+            **VALID_COMMITTEE,
+            "candidate_ids": None,
+            "sponsor_candidate_ids": None,
+        }
+        result = CommitteeIn.model_validate(raw)
+        assert result.candidate_ids == []
+        assert result.sponsor_candidate_ids == []
+
     def test_whitespace_stripped(self):
         raw = {**VALID_COMMITTEE, "name": "  Test PAC  ", "state": " VA "}
         result = CommitteeIn.model_validate(raw)
