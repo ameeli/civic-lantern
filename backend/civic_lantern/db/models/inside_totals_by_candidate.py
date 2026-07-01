@@ -5,8 +5,8 @@ from civic_lantern.db.models.base import Base
 from civic_lantern.db.models.mixins import TimestampMixin
 
 
-class CandidateInsideTotals(Base, TimestampMixin):
-    __tablename__ = "candidate_inside_totals"
+class InsideTotalsByCandidate(Base, TimestampMixin):
+    __tablename__ = "inside_totals_by_candidate"
 
     candidate_id = Column(
         String, ForeignKey("candidates.candidate_id"), primary_key=True
@@ -20,6 +20,6 @@ class CandidateInsideTotals(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return (
-            f"<CandidateInsideTotals(candidate_id='{self.candidate_id}', "
+            f"<InsideTotalsByCandidate(candidate_id='{self.candidate_id}', "
             f"cycle={self.cycle}, disbursements={self.disbursements})>"
         )
