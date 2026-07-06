@@ -67,16 +67,14 @@ class TestInsideTotalsByCandidateUpsert:
 
     async def test_upsert_updates_existing_record(self, async_db, two_candidates):
         service = InsideTotalsByCandidateService(db=async_db)
-        stats = await service.upsert_batch(
-            [
-                {
-                    "candidate_id": "C001",
-                    "cycle": 2024,
-                    "receipts": Decimal("600000.00"),
-                    "disbursements": Decimal("580000.00"),
-                }
-            ]
-        )
+        stats = await service.upsert_batch([
+            {
+                "candidate_id": "C001",
+                "cycle": 2024,
+                "receipts": Decimal("600000.00"),
+                "disbursements": Decimal("580000.00"),
+            }
+        ])
 
         assert stats["updated"] == 1
         assert stats["inserted"] == 0
@@ -86,17 +84,14 @@ class TestInsideTotalsByCandidateUpsert:
 
     async def test_upsert_inserts_new_cycle(self, async_db, two_candidates):
         service = InsideTotalsByCandidateService(db=async_db)
-        stats = await service.upsert_batch(
-            [
-                {
-                    "candidate_id": "C001",
-                    "cycle": 2022,
-                    "receipts": Decimal("200000.00"),
-                    "disbursements": Decimal("190000.00"),
-                }
-            ]
-        )
-
+        stats = await service.upsert_batch([
+            {
+                "candidate_id": "C001",
+                "cycle": 2022,
+                "receipts": Decimal("200000.00"),
+                "disbursements": Decimal("190000.00"),
+            }
+        ])
         assert stats["inserted"] == 1
 
     async def test_null_receipts_stored(self, async_db):
@@ -124,29 +119,20 @@ class TestInsideTotalsByCandidateUpsert:
             candidates=[Candidate(candidate_id="C001", name="Alice")],
             rows=[
                 InsideTotalsByCandidate(
-                    candidate_id="C001",
-                    cycle=2020,
-                    receipts=Decimal("100000.00"),
-                    disbursements=Decimal("90000.00"),
+                    candidate_id="C001", cycle=2020,
+                    receipts=Decimal("100000.00"), disbursements=Decimal("90000.00"),
                 ),
                 InsideTotalsByCandidate(
-                    candidate_id="C001",
-                    cycle=2022,
-                    receipts=Decimal("200000.00"),
-                    disbursements=Decimal("190000.00"),
+                    candidate_id="C001", cycle=2022,
+                    receipts=Decimal("200000.00"), disbursements=Decimal("190000.00"),
                 ),
                 InsideTotalsByCandidate(
-                    candidate_id="C001",
-                    cycle=2024,
-                    receipts=Decimal("300000.00"),
-                    disbursements=Decimal("290000.00"),
+                    candidate_id="C001", cycle=2024,
+                    receipts=Decimal("300000.00"), disbursements=Decimal("290000.00"),
                 ),
             ],
         )
-        service = InsideTotalsByCandidateService(db=async_db)
-
-        # Each cycle stored independently — PK is (candidate_id, cycle)
-        for cycle, expected_receipts in [
+        for cycle, expected in [
             (2020, Decimal("100000.00")),
             (2022, Decimal("200000.00")),
             (2024, Decimal("300000.00")),
@@ -154,4 +140,4 @@ class TestInsideTotalsByCandidateUpsert:
             result = await async_db.get(
                 InsideTotalsByCandidate, {"candidate_id": "C001", "cycle": cycle}
             )
-            assert result.receipts == expected_receipts
+            assert result.receipts == expected

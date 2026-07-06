@@ -36,9 +36,9 @@ if __name__ == "__main__":
         #     entities=["candidate_spending"],
         # )
         ingest(
-            start_date="2024-01-01",
-            end_date="2024-02-01",
-            entities=["committees"],
+            # start_date="2024-01-01",
+            # end_date="2024-02-01",
+            entities=["inside_totals_by_candidate"],
             cycle=2024,
         )
     )
