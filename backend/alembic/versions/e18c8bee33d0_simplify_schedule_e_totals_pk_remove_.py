@@ -1,0 +1,82 @@
+"""simplify_schedule_e_totals_pk_remove_committee_id
+
+Revision ID: e18c8bee33d0
+Revises: 8339719380a3
+Create Date: 2026-07-06 15:32:04.713793
+
+"""
+
+from typing import Sequence, Union
+
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision: str = "e18c8bee33d0"
+down_revision: Union[str, Sequence[str], None] = "8339719380a3"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    support_oppose_enum = postgresql.ENUM(
+        "S", "O", name="support_oppose_enum", create_type=False
+    )
+    op.drop_table("schedule_e_totals_by_candidate")
+    op.create_table(
+        "schedule_e_totals_by_candidate",
+        sa.Column("candidate_id", sa.String(), nullable=False),
+        sa.Column("cycle", sa.Integer(), nullable=False),
+        sa.Column("support_oppose_indicator", support_oppose_enum, nullable=False),
+        sa.Column("total", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["candidate_id"], ["candidates.candidate_id"]),
+        sa.PrimaryKeyConstraint("candidate_id", "cycle", "support_oppose_indicator"),
+    )
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    support_oppose_enum = postgresql.ENUM(
+        "S", "O", name="support_oppose_enum", create_type=False
+    )
+    op.drop_table("schedule_e_totals_by_candidate")
+    op.create_table(
+        "schedule_e_totals_by_candidate",
+        sa.Column("committee_id", sa.String(), nullable=False),
+        sa.Column("candidate_id", sa.String(), nullable=False),
+        sa.Column("cycle", sa.Integer(), nullable=False),
+        sa.Column("support_oppose_indicator", support_oppose_enum, nullable=False),
+        sa.Column("total", sa.Numeric(precision=14, scale=2), nullable=True),
+        sa.Column("count", sa.Integer(), nullable=True),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["candidate_id"], ["candidates.candidate_id"]),
+        sa.PrimaryKeyConstraint(
+            "committee_id", "candidate_id", "cycle", "support_oppose_indicator"
+        ),
+    )
