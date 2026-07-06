@@ -39,8 +39,8 @@ class FECClient:
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
-        # max_rate=1 prevents burst — releases exactly 1 request per 4 seconds (~15/min).
-        # The FEC API has an undocumented per-minute burst limit, set to 60 req/min.
+        # The FEC API has an undocumented per-minute burst limit
+        # max_rate=1 allows 60 req/min.
         self.minute_limiter = AsyncLimiter(max_rate=1, time_period=1)
 
     @fec_retry
