@@ -6,12 +6,10 @@ from civic_lantern.db.models.enums import SupportOpposeEnum
 
 
 class ScheduleETotalsByCandidateIn(BaseModel):
-    committee_id: str = Field(..., min_length=1)
     candidate_id: str = Field(..., min_length=1)
     cycle: int
     support_oppose_indicator: SupportOpposeEnum
     total: Optional[float] = None
-    count: Optional[int] = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

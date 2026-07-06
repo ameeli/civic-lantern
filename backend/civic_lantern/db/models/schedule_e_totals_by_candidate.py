@@ -10,8 +10,6 @@ from civic_lantern.db.models.mixins import TimestampMixin
 class ScheduleETotalsByCandidate(Base, TimestampMixin):
     __tablename__ = "schedule_e_totals_by_candidate"
 
-    # No FK on committee_id — some filers may not be in our committees table.
-    committee_id = Column(String, primary_key=True)
     candidate_id = Column(
         String, ForeignKey("candidates.candidate_id"), primary_key=True
     )
@@ -27,14 +25,12 @@ class ScheduleETotalsByCandidate(Base, TimestampMixin):
     )
 
     total = Column(Numeric(14, 2))
-    count = Column(Integer)
 
     candidate = relationship("Candidate")
 
     def __repr__(self) -> str:
         return (
             f"<ScheduleETotalsByCandidate("
-            f"committee_id='{self.committee_id}', "
             f"candidate_id='{self.candidate_id}', "
             f"cycle={self.cycle}, "
             f"indicator={self.support_oppose_indicator}, "
