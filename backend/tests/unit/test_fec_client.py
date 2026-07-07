@@ -137,7 +137,10 @@ class TestFECClientRateLimiting:
         respx.get(url__startswith=client.candidate_url).mock(
             return_value=httpx.Response(
                 200,
-                json={"results": [{"candidate_id": "C001"}], "pagination": {"pages": 1}},
+                json={
+                    "results": [{"candidate_id": "C001"}],
+                    "pagination": {"pages": 1},
+                },
             )
         )
         mock_hourly = AsyncMock()
