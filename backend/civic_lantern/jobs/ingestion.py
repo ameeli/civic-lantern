@@ -31,14 +31,8 @@ async def ingest(
 if __name__ == "__main__":
     configure_logging()
     asyncio.run(
-        # ingest(
-        #     cycle=2024,
-        #     entities=["candidate_spending"],
-        # )
         ingest(
-            # start_date="2024-01-01",
-            # end_date="2024-02-01",
-            entities=["inside_totals_by_candidate"],
             cycle=2024,
+            entities=["schedule_e_totals_by_candidate"],
         )
     )

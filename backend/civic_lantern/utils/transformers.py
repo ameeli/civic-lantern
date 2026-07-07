@@ -6,6 +6,9 @@ from pydantic import BaseModel, ValidationError
 from civic_lantern.schemas.candidate import CandidateIn
 from civic_lantern.schemas.committee import CommitteeIn
 from civic_lantern.schemas.inside_totals_by_candidate import InsideTotalsByCandidateIn
+from civic_lantern.schemas.schedule_e_totals_by_candidate import (
+    ScheduleETotalsByCandidateIn,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,49 @@ def transform_inside_totals_by_candidate(
 
     logger.info(
         f"Successfully transformed {len(results)} inside totals from "
+        f"{len(raw_records)} records."
+    )
+    return results
+
+
+def transform_schedule_e_totals_by_candidate(
+    raw_records: List[Dict[str, Any]],
+) -> List[ScheduleETotalsByCandidateIn]:
+    """Transform raw FEC schedule E totals by candidate.
+
+    Skips rows without a candidate_id — some IEs are not attributed to a
+    specific candidate. Deduplicates by composite key
+    (committee_id, candidate_id, cycle, support_oppose_indicator).
+    """
+    results = []
+    seen: set[tuple] = set()
+
+    for idx, item in enumerate(raw_records):
+        candidate_id = item.get("candidate_id")
+        cycle = item.get("cycle")
+        indicator = item.get("support_oppose_indicator")
+
+        if not candidate_id or not cycle or not indicator:
+            logger.warning(
+                f"Skipping schedule E row at index {idx}: "
+                f"missing candidate_id, cycle, or support_oppose_indicator"
+            )
+            continue
+
+        key = (candidate_id, cycle, indicator)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        try:
+            results.append(ScheduleETotalsByCandidateIn.model_validate(item))
+        except ValidationError as e:
+            logger.warning(f"Skipping schedule E row for {candidate_id}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected crash on schedule E row for {candidate_id}: {e}")
+
+    logger.info(
+        f"Successfully transformed {len(results)} schedule E totals from "
         f"{len(raw_records)} records."
     )
     return results
