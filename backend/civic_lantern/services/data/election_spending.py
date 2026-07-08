@@ -4,7 +4,9 @@ from typing import Sequence
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from civic_lantern.db.models.election_spending import MvElectionSpendingSummary
+from civic_lantern.db.models.mv_election_spending_summary import (
+    MvElectionSpendingSummary,
+)
 from civic_lantern.services.data.base import BaseService
 
 logger = logging.getLogger(__name__)

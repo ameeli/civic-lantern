@@ -1,7 +1,9 @@
 import pytest
 from sqlalchemy.sql import operators
 
-from civic_lantern.db.models.election_spending import MvElectionSpendingSummary
+from civic_lantern.db.models.mv_election_spending_summary import (
+    MvElectionSpendingSummary,
+)
 from civic_lantern.services.data.election_spending import ElectionSpendingService
 from tests.unit.conftest import scalars_all_result, scalars_first_result
 
