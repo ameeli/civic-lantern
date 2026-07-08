@@ -4,6 +4,7 @@ from .candidate_spending import CandidateSpendingTotals
 from .committee import Committee
 from .election_spending import MvElectionSpendingSummary
 from .inside_totals_by_candidate import InsideTotalsByCandidate
+from .mv_candidate_spending_summary import MvCandidateSpendingSummary
 from .schedule_e_totals_by_candidate import ScheduleETotalsByCandidate
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "CandidateSpendingTotals",
     "Committee",
     "MvElectionSpendingSummary",
+    "MvCandidateSpendingSummary",
 ]
