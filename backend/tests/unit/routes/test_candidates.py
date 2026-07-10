@@ -1,7 +1,7 @@
 import pytest
 
 from civic_lantern.db.models.candidate import Candidate
-from civic_lantern.db.models.candidate_spending import CandidateSpendingTotals
+from civic_lantern.db.models.mv_candidate_spending_summary import MvCandidateSpendingSummary
 from civic_lantern.main import app
 from tests.unit.conftest import scalar_result, scalars_all_result, scalars_first_result
 
@@ -33,7 +33,7 @@ def candidate():
 
 @pytest.fixture
 def spending(candidate):
-    s = CandidateSpendingTotals(candidate_id="C001", cycle=2024)
+    s = MvCandidateSpendingSummary(candidate_id="C001", cycle=2024)
     s.candidate = candidate
     return s
 

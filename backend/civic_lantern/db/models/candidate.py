@@ -58,6 +58,3 @@ class Candidate(Base, TimestampMixin):
     last_file_date = Column(Date)
     load_date = Column(DateTime(timezone=True))
 
-    spending_totals = relationship(
-        "CandidateSpendingTotals", back_populates="candidate"
-    )
