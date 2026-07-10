@@ -3,9 +3,8 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
 from aiolimiter import AsyncLimiter
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from civic_lantern.core.config import get_settings
 from civic_lantern.db.models import Base
