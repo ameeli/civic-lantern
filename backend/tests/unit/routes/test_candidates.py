@@ -50,6 +50,7 @@ class TestListCandidateSpending:
         mock_session.execute.side_effect = [
             scalar_result(1),
             scalars_all_result([spending]),
+            scalars_all_result([spending.candidate]),  # _attach_candidates lookup
         ]
         response = await api_client.get(SPENDING_LIST_URL)
         assert response.status_code == 200
@@ -112,8 +113,9 @@ class TestGetCandidateSpending:
         self, api_client, mock_session, candidate, spending
     ):
         mock_session.execute.side_effect = [
-            scalars_first_result(candidate),
-            scalars_all_result([spending]),
+            scalars_first_result(candidate),  # candidate existence check
+            scalars_all_result([spending]),  # spending data
+            scalars_all_result([candidate]),  # _attach_candidates lookup
         ]
         response = await api_client.get(candidate_spending_url("C001"))
         assert response.status_code == 200

@@ -5,7 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.expression import BinaryExpression
 
-from civic_lantern.db.models.candidate_spending import CandidateSpendingTotals
+from civic_lantern.db.models.mv_candidate_spending_summary import (
+    MvCandidateSpendingSummary,
+)
 from civic_lantern.services.data.candidate_spending import CandidateSpendingService
 from tests.unit.conftest import scalar_result, scalars_all_result
 
@@ -17,7 +19,7 @@ def service(mock_session):
 
 @pytest.fixture
 def base_stmt():
-    return select(CandidateSpendingTotals)
+    return select(MvCandidateSpendingSummary)
 
 
 @pytest.mark.unit
@@ -86,7 +88,7 @@ class TestGetList:
         assert len(result["items"]) == 0
 
     async def test_makes_two_db_calls(self, service, mock_session):
-        """One execute for the count, one for the data — never conflated."""
+        """One execute for count, one for data. _attach_candidates short-circuits on empty."""
         mock_session.execute.side_effect = [scalar_result(0), scalars_all_result([])]
         await service.get_list()
         assert mock_session.execute.call_count == 2
