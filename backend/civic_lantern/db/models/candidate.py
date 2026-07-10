@@ -10,7 +10,6 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import relationship
 
 from civic_lantern.db.models.base import Base, enum_values_callable
 from civic_lantern.db.models.enums import OfficeTypeEnum
@@ -57,4 +56,3 @@ class Candidate(Base, TimestampMixin):
     last_f2_date = Column(Date)
     last_file_date = Column(Date)
     load_date = Column(DateTime(timezone=True))
-

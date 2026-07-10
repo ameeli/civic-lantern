@@ -1,7 +1,9 @@
 import pytest
 
 from civic_lantern.db.models.candidate import Candidate
-from civic_lantern.db.models.mv_candidate_spending_summary import MvCandidateSpendingSummary
+from civic_lantern.db.models.mv_candidate_spending_summary import (
+    MvCandidateSpendingSummary,
+)
 from civic_lantern.main import app
 from tests.unit.conftest import scalar_result, scalars_all_result, scalars_first_result
 
