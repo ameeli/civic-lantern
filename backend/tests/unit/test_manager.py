@@ -111,25 +111,26 @@ class TestIngestionManager:
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
     async def test_refresh_spending_stats_uses_text(self, MockSession, manager):
-        """refresh_spending_stats() wraps the SQL string in text()."""
+        """refresh_spending_stats() issues two REFRESH statements via text()."""
         mock_session = AsyncMock()
         MockSession.return_value.__aenter__.return_value = mock_session
 
         await manager.refresh_spending_stats()
 
-        mock_session.execute.assert_awaited_once()
-        call_arg = mock_session.execute.call_args[0][0]
-        assert isinstance(call_arg, TextClause)
-        assert "mv_election_spending_summary" in str(call_arg)
+        assert mock_session.execute.await_count == 2
+        calls = [str(c.args[0]) for c in mock_session.execute.call_args_list]
+        assert any("mv_candidate_spending_summary" in c for c in calls)
+        assert any("mv_election_spending_summary" in c for c in calls)
+        assert all(isinstance(c.args[0], TextClause) for c in mock_session.execute.call_args_list)
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
     async def test_ingest_batch_refreshes_mv_on_spending_success(
         self, MockSession, manager
     ):
-        """MV refresh is triggered when candidate_spending ingestion succeeds."""
+        """MV refresh is triggered when a spending source ingestor succeeds."""
         mock_ingestor = MagicMock()
         mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
-        registry = {"candidate_spending": mock_ingestor}
+        registry = {"inside_totals_by_candidate": mock_ingestor}
 
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             with patch.object(
@@ -143,7 +144,7 @@ class TestIngestionManager:
     async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
         self, MockSession, manager
     ):
-        """MV refresh is skipped when candidate_spending ingestion errors."""
+        """MV refresh is skipped when all spending source ingestors error."""
 
         class FailingSpendingIngestor:
             def __init__(self, **kwargs):
@@ -154,7 +155,7 @@ class TestIngestionManager:
 
         MockSession.return_value.__aenter__.return_value = AsyncMock()
 
-        registry = {"candidate_spending": FailingSpendingIngestor}
+        registry = {"inside_totals_by_candidate": FailingSpendingIngestor}
         with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
             with patch.object(
                 manager, "refresh_spending_stats", new_callable=AsyncMock

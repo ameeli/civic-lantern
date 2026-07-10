@@ -86,18 +86,36 @@ class IngestionManager:
                 logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
                 results[name] = {"error": str(e)}
 
-        # Update materialized view only if spending ingestion succeeded
-        spending_result = results.get("candidate_spending", {})
-        if "candidate_spending" in targets and "error" not in spending_result:
+        # Refresh MVs if any spending source ingestor ran and succeeded.
+        spending_ingestors = {
+            "inside_totals_by_candidate",
+            "schedule_e_totals_by_candidate",
+        }
+        ran = spending_ingestors & set(targets)
+        any_succeeded = any(
+            results.get(name) and "error" not in results.get(name, {})
+            for name in ran
+        )
+        if any_succeeded:
             await self.refresh_spending_stats()
 
         return results
 
     async def refresh_spending_stats(self) -> None:
-        """Refresh the materialized view for global spending totals."""
+        """Refresh candidate and election spending materialized views.
+
+        mv_candidate_spending_summary must be refreshed before
+        mv_election_spending_summary since the latter sources from the former.
+        CONCURRENTLY allows reads to continue during each refresh.
+        """
         async with AsyncSessionLocal() as session:
             try:
-                # CONCURRENTLY allows reads to continue while refreshing
+                await session.execute(
+                    text(
+                        "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+                        "mv_candidate_spending_summary"
+                    )
+                )
                 await session.execute(
                     text(
                         "REFRESH MATERIALIZED VIEW CONCURRENTLY "
@@ -105,9 +123,7 @@ class IngestionManager:
                     )
                 )
                 await session.commit()
-                logger.info(
-                    "✅ Materialized view 'mv_election_spending_summary' refreshed."
-                )
+                logger.info("✅ Materialized views refreshed.")
             except Exception as e:
-                logger.error(f"Failed to refresh materialized view: {e}", exc_info=True)
+                logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
                 await session.rollback()
