@@ -71,6 +71,33 @@ class TestApplySorting:
 
 
 @pytest.mark.unit
+class TestApplyFilters:
+    def test_no_filter_when_value_is_none(self, service, base_stmt):
+        filtered = service._apply_filters(base_stmt, cycle=None)
+        assert "WHERE" not in str(filtered)
+
+    def test_adds_where_clause_when_value_provided(self, service, base_stmt):
+        filtered = service._apply_filters(base_stmt, cycle=2024)
+        assert "WHERE" in str(filtered)
+
+    def test_where_clause_targets_correct_column(self, service, base_stmt):
+        filtered = service._apply_filters(base_stmt, cycle=2024)
+        assert "cycle" in str(filtered).lower()
+
+    def test_multiple_filters_all_applied(self, service, base_stmt):
+        filtered = service._apply_filters(base_stmt, cycle=2024, candidate_id="P001")
+        compiled = str(filtered)
+        assert "cycle" in compiled.lower()
+        assert "candidate_id" in compiled.lower()
+
+    def test_none_values_skipped_other_filters_applied(self, service, base_stmt):
+        filtered = service._apply_filters(base_stmt, cycle=None, candidate_id="P001")
+        compiled = str(filtered)
+        assert "candidate_id" in compiled.lower()
+        assert compiled.count("WHERE") == 1
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 class TestGetList:
     async def test_returns_expected_keys(self, service, mock_session):

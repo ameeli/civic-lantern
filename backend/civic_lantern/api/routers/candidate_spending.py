@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,10 +19,11 @@ async def list_candidate_spending(
     offset: int = Query(0, ge=0),
     sort_by: SpendingSortBy = Query("outside_total", description="Field to sort by"),
     order: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
+    cycle: Optional[int] = Query(None, description="Filter by election cycle"),
     db: AsyncSession = Depends(get_db),
 ):
     """List spending totals for all candidates with pagination."""
     service = CandidateSpendingService(db)
     return await service.get_list(
-        limit=limit, offset=offset, sort_by=sort_by, order=order
+        limit=limit, offset=offset, sort_by=sort_by, order=order, cycle=cycle
     )

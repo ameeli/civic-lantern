@@ -20,6 +20,13 @@ class BaseService(Generic[T]):
         if not hasattr(self, "index_elements"):
             self.index_elements = [self.pk_name]
 
+    def _apply_filters(self, stmt: Any, **filters: Any) -> Any:
+        """Apply equality filters to a select statement, skipping None values."""
+        for field, value in filters.items():
+            if value is not None:
+                stmt = stmt.where(getattr(self.model, field) == value)
+        return stmt
+
     async def get_by_id(self, id: str):
         """Fetch a single record by its primary key."""
         pk_column = getattr(self.model, self.pk_name)

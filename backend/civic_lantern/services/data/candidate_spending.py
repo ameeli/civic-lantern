@@ -1,4 +1,4 @@
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Optional, Sequence
 
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,8 +67,10 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
         offset: int = 0,
         sort_by: SpendingSortBy = "outside_total",
         order: Literal["asc", "desc"] = "desc",
+        cycle: Optional[int] = None,
     ) -> dict[str, Any]:
         base_stmt = self._build_base_query()
+        base_stmt = self._apply_filters(base_stmt, cycle=cycle)
 
         count_stmt = select(func.count()).select_from(base_stmt.subquery())
         total_count = (await self.db.execute(count_stmt)).scalar() or 0
