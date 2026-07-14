@@ -36,3 +36,21 @@ export interface CandidateSpendingList {
   limit: number;
   offset: number;
 }
+
+export type SpendingSortBy =
+  | "cycle"
+  | "inside_receipts"
+  | "inside_disbursements"
+  | "outside_support"
+  | "outside_oppose"
+  | "outside_total"
+  | "influence_ratio"
+  | "vulnerability_factor";
+
+export interface CandidateSpendingParams {
+  cycle?: number;
+  limit?: number;
+  offset?: number;
+  sort_by?: SpendingSortBy;
+  order?: "asc" | "desc";
+}
