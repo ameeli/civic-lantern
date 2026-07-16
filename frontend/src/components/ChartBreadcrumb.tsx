@@ -9,8 +9,6 @@ export default function ChartBreadcrumb({
   path,
   onNavigate,
 }: ChartBreadcrumbProps) {
-  if (path.length === 0) return null;
-
   return (
     <nav className="flex items-center gap-1 text-sm font-headline italic ink-press">
       {path.map((segment, i) => (

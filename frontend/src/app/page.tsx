@@ -1,4 +1,5 @@
 import ElectionSpendingSection from "@/components/ElectionSpendingSection";
+import SpendingPackChartSection from "@/components/SpendingPackChartSection";
 import Gavel from "@/components/Gavel";
 import MastheadRule from "@/components/MastheadRule";
 import PaperBorder from "@/components/PaperBorder";
@@ -15,6 +16,7 @@ export default function Home() {
           </MastheadRule>
         </div>
         <ElectionSpendingSection cycle={2024} />
+        <SpendingPackChartSection cycle={2024} />
       </main>
     </div>
   );

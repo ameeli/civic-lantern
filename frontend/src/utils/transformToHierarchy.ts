@@ -30,19 +30,22 @@ export function transformToHierarchy(
   candidates: CandidateSpending[],
   threshold: number,
 ): HierarchyRoot {
-  const above: Record<string, CandidateSpending[]> = { P: [], S: [], H: [] };
-  const othersValue: Record<string, number> = { P: 0, S: 0, H: 0 };
+  const aboveThreshold: Record<string, CandidateSpending[]> = {
+    P: [],
+    S: [],
+    H: [],
+  };
+  const belowThreshold: Record<string, number> = { P: 0, S: 0, H: 0 };
 
   for (const c of candidates) {
     const office = c.candidate?.office;
-    if (!office || !(office in above)) continue;
+    if (!office || !(office in aboveThreshold)) continue;
 
     const outsideTotal = (c.outside_support ?? 0) + (c.outside_oppose ?? 0);
     if (outsideTotal >= threshold) {
-      above[office].push(c);
+      aboveThreshold[office].push(c);
     } else {
-      othersValue[office] +=
-        (c.inside_disbursements ?? 0) + outsideTotal;
+      belowThreshold[office] += (c.inside_disbursements ?? 0) + outsideTotal;
     }
   }
 
@@ -58,8 +61,8 @@ export function transformToHierarchy(
   const toRaceNode = (office: string): RaceNode => ({
     name: OFFICE_LABELS[office],
     children: [
-      ...above[office].map(toCandidateNode),
-      { name: "Others", value: othersValue[office] },
+      ...aboveThreshold[office].map(toCandidateNode),
+      { name: "Others", value: belowThreshold[office] },
     ],
   });
 
