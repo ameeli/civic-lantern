@@ -76,13 +76,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .attr("fill", (d) => (d.children ? "none" : "currentColor"))
       .attr("stroke", (d) => (d.children ? "currentColor" : "none"))
       .attr("stroke-width", 1)
-      .attr("opacity", (d) => (d.depth === 0 ? 0 : 0.7))
       .attr("cursor", (d) => (d.children ? "pointer" : "default"))
-      .attr("pointer-events", (d) => {
-        if (d.depth === 0) return "none";
-        if (d.children) return "all";
-        return "visiblePainted";
-      })
       .on("click", (event, d) => {
         if (d.children) {
           zoomTo(d);
@@ -116,12 +110,24 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         .attr("r", (d) => d.r * k);
       label
         .attr("transform", translate)
-        .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)))
-        .attr("opacity", (d) => (d.r * k < 20 ? 0 : 1));
+        .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)));
+    }
+
+    function updateVisibility(target: PackNode) {
+      const activeDepth = target.depth + 1;
+      node
+        .attr("opacity", (d) => (d.depth === activeDepth ? 0.7 : 0))
+        .attr("pointer-events", (d) => {
+          if (d.depth !== activeDepth) return "none";
+          if (d.children) return "all";
+          return "visiblePainted";
+        });
+      label.attr("opacity", (d) => (d.depth === activeDepth ? 1 : 0));
     }
 
     function zoomTo(target: PackNode) {
       focusRef.current = target;
+      updateVisibility(target);
 
       const rawPath = target
         .ancestors()
@@ -149,6 +155,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
 
     zoomFnRef.current = zoomTo;
     setView(view);
+    updateVisibility(packRoot);
   }, [hierarchy, width, height]);
 
   function handleNavigate(depth: number) {
