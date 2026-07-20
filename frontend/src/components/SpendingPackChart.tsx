@@ -90,6 +90,16 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         }
       });
 
+    const label = svg
+      .append("g")
+      .selectAll<SVGTextElement, PackNode>("text")
+      .data(packRoot.descendants().filter((d) => d.depth === 1 || d.depth === 2))
+      .join("text")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("pointer-events", "none")
+      .text((d) => d.data.name);
+
     // Click background to go up one level
     svg.on("click", () => {
       const focused = focusRef.current;
@@ -99,13 +109,15 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     function setView(v: [number, number, number]) {
       view = v;
       const k = width / v[2];
+      const translate = (d: PackNode) =>
+        `translate(${(d.x - v[0]) * k + width / 2},${(d.y - v[1]) * k + height / 2})`;
       node
-        .attr(
-          "transform",
-          (d) =>
-            `translate(${(d.x - v[0]) * k + width / 2},${(d.y - v[1]) * k + height / 2})`,
-        )
+        .attr("transform", translate)
         .attr("r", (d) => d.r * k);
+      label
+        .attr("transform", translate)
+        .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)))
+        .attr("opacity", (d) => (d.r * k < 20 ? 0 : 1));
     }
 
     function zoomTo(target: PackNode) {
