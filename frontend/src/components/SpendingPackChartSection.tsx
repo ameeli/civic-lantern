@@ -14,7 +14,7 @@ export default async function SpendingPackChartSection({
   });
   // console.log("items:", items);
   return (
-    <div className="col-span-12 sm:col-span-12 lg:col-span-9">
+    <div className="col-span-12 sm:col-span-12 lg:col-span-7">
       <SpendingPackChart data={items} />
     </div>
   );

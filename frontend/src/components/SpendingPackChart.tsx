@@ -87,7 +87,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     const label = svg
       .append("g")
       .selectAll<SVGTextElement, PackNode>("text")
-      .data(packRoot.descendants().filter((d) => d.depth === 1 || d.depth === 2))
+      .data(packRoot.descendants().filter((d) => d.depth === 1 || d.depth === 2 || d.depth === 3))
       .join("text")
       .attr("text-anchor", "middle")
       .attr("dominant-baseline", "middle")
