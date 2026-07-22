@@ -15,6 +15,13 @@ import type { CandidateSpending } from "@/types/spending";
 
 const THRESHOLD = 1_000_000;
 
+function formatDollars(v: number): string {
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
+  return `$${Math.round(v)}`;
+}
+
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
@@ -90,9 +97,17 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .data(packRoot.descendants().filter((d) => d.depth === 1 || d.depth === 2 || d.depth === 3))
       .join("text")
       .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .attr("pointer-events", "none")
+      .attr("pointer-events", "none");
+
+    label.append("tspan")
+      .attr("x", 0)
+      .attr("dy", "-0.6em")
       .text((d) => d.data.name);
+
+    label.append("tspan")
+      .attr("x", 0)
+      .attr("dy", "1.2em")
+      .text((d) => formatDollars(d.value ?? 0));
 
     // Click background to go up one level
     svg.on("click", () => {
