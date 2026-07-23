@@ -12,6 +12,10 @@
   --color-lantern-light: #ffeba066;
   --color-lantern-core: #fffadcb3;
   --color-lantern-amber: #e8961e;
+  --color-party-dem: #274156;
+  --color-party-rep: #8c2d2d;
+  --color-party-neutral: #c69214
+  ;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 }
@@ -32,6 +36,10 @@ body {
   @apply bg-background text-foreground;
   font-family: var(--font-sans);
 }
+
+.fill-party-dem { fill: var(--color-party-dem); }
+.fill-party-rep { fill: var(--color-party-rep); }
+.fill-party-neutral { fill: var(--color-party-neutral); }
 
 @utility bg-dark-wood {
   background-color: var(--color-wood-mid);

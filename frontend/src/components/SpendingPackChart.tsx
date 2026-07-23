@@ -22,6 +22,12 @@ function formatDollars(v: number): string {
   return `$${Math.round(v)}`;
 }
 
+function partyClass(party: string | null): string {
+  if (party === "DEM" || party === "DFL") return "fill-party-dem";
+  if (party === "REP") return "fill-party-rep";
+  return "fill-party-neutral";
+}
+
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
@@ -81,6 +87,9 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .data(packRoot.descendants())
       .join("circle")
       .attr("fill", (d) => (d.children ? "none" : "currentColor"))
+      .attr("class", (d) =>
+        d.depth === 2 ? partyClass((d.data as CandidateNode).party) : null,
+      )
       .attr("stroke", (d) => (d.children ? "currentColor" : "none"))
       .attr("stroke-width", 1)
       .attr("cursor", (d) => (d.children ? "pointer" : "default"))

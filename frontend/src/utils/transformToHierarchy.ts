@@ -7,6 +7,7 @@ export interface SpendingLeaf {
 
 export interface CandidateNode {
   name: string;
+  party: string | null;
   children: SpendingLeaf[];
 }
 
@@ -51,6 +52,7 @@ export function transformToHierarchy(
 
   const toCandidateNode = (c: CandidateSpending): CandidateNode => ({
     name: c.candidate?.name ?? c.candidate_id,
+    party: c.candidate?.party ?? null,
     children: [
       { name: "Inside", value: c.inside_disbursements ?? 0 },
       { name: "Outside Support", value: c.outside_support ?? 0 },
