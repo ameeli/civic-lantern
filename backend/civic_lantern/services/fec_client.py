@@ -33,9 +33,6 @@ class FECClient:
         self.candidate_url = f"{self.base_url}/candidates/"
         self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
         self.committee_url = f"{self.base_url}/committees/"
-        # self.outside_spending_url = (
-        #     f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
-        # )
         self.schedule_e_by_candidate_url = (
             f"{self.base_url}/schedules/schedule_e/by_candidate/"
         )
