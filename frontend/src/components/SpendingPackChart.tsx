@@ -31,6 +31,53 @@ function partyClass(party: string | null): string {
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
+function wrapLabel(
+  selection: d3.Selection<SVGTextElement, PackNode, SVGGElement, unknown>,
+): void {
+  selection.each(function (d) {
+    const el = d3.select(this);
+    el.text(null);
+
+    const words = d.data.name.split(/\s+/).filter(Boolean);
+
+    // Virtual (uncapped) font-size ratio: same 0.25 factor setView uses to
+    // render, but without the 16px cap and without the k multiplier. Always
+    // >= the real rendered ratio (min(0.25, 16/(d.r*k))) for any zoom level,
+    // so wrapping against it is the worst-case bound and stays valid at
+    // every future zoom level without re-wrapping on each tick.
+    const virtualFontSize = d.r * 0.25;
+    const maxWidth = d.r * 1.6;
+
+    const scratch = el.append("tspan").attr("font-size", virtualFontSize);
+    const lines: string[] = [];
+    let currentWords: string[] = [];
+    for (const word of words) {
+      const candidate = [...currentWords, word].join(" ");
+      scratch.text(candidate);
+      const width = scratch.node()?.getComputedTextLength() ?? 0;
+      if (width > maxWidth && currentWords.length > 0) {
+        lines.push(currentWords.join(" "));
+        currentWords = [word];
+      } else {
+        currentWords.push(word);
+      }
+    }
+    if (currentWords.length > 0) lines.push(currentWords.join(" "));
+    scratch.remove();
+
+    const allLines = [...lines, formatDollars(d.value ?? 0)];
+    const lineHeight = 1.1;
+    const startDy = -((allLines.length - 1) / 2) * lineHeight;
+
+    allLines.forEach((line, i) => {
+      el.append("tspan")
+        .attr("x", 0)
+        .attr("dy", `${i === 0 ? startDy : lineHeight}em`)
+        .text(line);
+    });
+  });
+}
+
 interface SpendingPackChartProps {
   data: CandidateSpending[];
 }
@@ -108,15 +155,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .attr("text-anchor", "middle")
       .attr("pointer-events", "none");
 
-    label.append("tspan")
-      .attr("x", 0)
-      .attr("dy", "-0.6em")
-      .text((d) => d.data.name);
-
-    label.append("tspan")
-      .attr("x", 0)
-      .attr("dy", "1.2em")
-      .text((d) => formatDollars(d.value ?? 0));
+    wrapLabel(label);
 
     // Click background to go up one level
     svg.on("click", () => {
