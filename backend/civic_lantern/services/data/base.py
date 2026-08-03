@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, Generic, List, Type, TypeVar, Union
 
 from pydantic import BaseModel
-from sqlalchemy import exc, inspect, literal_column, or_, select
+from sqlalchemy import exc, func, inspect, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +32,27 @@ class BaseService(Generic[T]):
         pk_column = getattr(self.model, self.pk_name)
         result = await self.db.execute(select(self.model).filter(pk_column == id))
         return result.scalars().first()
+
+    async def _paginate(
+        self, base_stmt: Any, sorted_stmt: Any, limit: int, offset: int
+    ) -> Dict[str, Any]:
+        """Count `base_stmt` and fetch one page from `sorted_stmt`.
+
+        `sorted_stmt` must already carry the same filters as `base_stmt` plus
+        an ORDER BY, since it's what gets limit/offset applied for the page.
+        """
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+        total_count = (await self.db.execute(count_stmt)).scalar() or 0
+
+        page_stmt = sorted_stmt.limit(limit).offset(offset)
+        result = await self.db.execute(page_stmt)
+
+        return {
+            "items": list(result.scalars().all()),
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+        }
 
     async def upsert_batch(
         self, data: Union[List[dict], List[BaseModel]], batch_size: int = 500

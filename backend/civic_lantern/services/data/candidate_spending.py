@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional, Sequence
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import asc, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
@@ -71,24 +71,11 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
     ) -> dict[str, Any]:
         base_stmt = self._build_base_query()
         base_stmt = self._apply_filters(base_stmt, cycle=cycle)
+        sorted_stmt = self._apply_sorting(base_stmt, sort_by, order)
 
-        count_stmt = select(func.count()).select_from(base_stmt.subquery())
-        total_count = (await self.db.execute(count_stmt)).scalar() or 0
-
-        data_stmt = (
-            self._apply_sorting(base_stmt, sort_by, order).limit(limit).offset(offset)
-        )
-        result = await self.db.execute(data_stmt)
-        items = list(result.scalars().all())
-
-        await self._attach_candidates(items)
-
-        return {
-            "items": items,
-            "total_count": total_count,
-            "limit": limit,
-            "offset": offset,
-        }
+        result = await self._paginate(base_stmt, sorted_stmt, limit, offset)
+        await self._attach_candidates(result["items"])
+        return result
 
     async def get_spending_by_candidate_id(
         self, candidate_id: str

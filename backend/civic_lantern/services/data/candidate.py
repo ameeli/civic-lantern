@@ -1,6 +1,6 @@
 from typing import Any, Literal, Optional
 
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import asc, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
@@ -57,18 +57,5 @@ class CandidateService(BaseService[Candidate]):
     ) -> dict[str, Any]:
         """Orchestrator: Coordinates building, counting, and fetching."""
         base_query = self._build_base_query(state, office, cycle)
-
-        count_stmt = select(func.count()).select_from(base_query.subquery())
-        total_count = (await self.db.execute(count_stmt)).scalar() or 0
-
         sorted_query = self._apply_sorting(base_query, sort_by, order)
-        final_query = sorted_query.limit(limit).offset(offset)
-
-        result = await self.db.execute(final_query)
-
-        return {
-            "items": result.scalars().all(),
-            "total_count": total_count,
-            "limit": limit,
-            "offset": offset,
-        }
+        return await self._paginate(base_query, sorted_query, limit, offset)
