@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from civic_lantern.api.deps import get_db
+from civic_lantern.api.deps import PaginationParams, get_db
 from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.schemas.candidate import CandidateList, CandidateOut, CandidateSortBy
 from civic_lantern.schemas.candidate_spending import CandidateSpendingSchema
@@ -20,8 +20,7 @@ async def list_candidates(
     ),
     office: Optional[OfficeTypeEnum] = Query(None, description="Office code (P, S, H)"),
     cycle: Optional[int] = Query(None, description="Election cycle year"),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
+    pagination: PaginationParams = Depends(),
     sort_by: CandidateSortBy = Query("name", description="Field to sort by"),
     order: Literal["asc", "desc"] = Query("asc", description="Sort direction"),
     db: AsyncSession = Depends(get_db),
@@ -38,8 +37,8 @@ async def list_candidates(
         state=safe_state,
         office=office,
         cycle=cycle,
-        limit=limit,
-        offset=offset,
+        limit=pagination.limit,
+        offset=pagination.offset,
         sort_by=sort_by,
         order=order,
     )
