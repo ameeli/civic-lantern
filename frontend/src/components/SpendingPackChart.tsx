@@ -35,6 +35,13 @@ function officeClass(office: string): string {
   return "fill-party-neutral";
 }
 
+function spendingClass(name: string): string {
+  if (name === "Inside") return "fill-office-president";
+  if (name === "Outside Oppose") return "fill-party-rep";
+  if (name === "Outside Support") return "fill-office-house";
+  return "fill-party-neutral";
+}
+
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
@@ -144,6 +151,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .attr("class", (d) => {
         if (d.depth === 1) return officeClass((d.data as RaceNode).name);
         if (d.depth === 2) return partyClass((d.data as CandidateNode).party);
+        if (d.depth === 3) return spendingClass((d.data as SpendingLeaf).name);
         return null;
       })
       .attr("stroke", (d) => (d.children ? "currentColor" : "none"))
