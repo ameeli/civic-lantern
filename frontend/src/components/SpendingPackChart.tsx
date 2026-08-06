@@ -154,8 +154,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         if (d.depth === 3) return spendingClass((d.data as SpendingLeaf).name);
         return null;
       })
-      .attr("stroke", (d) => (d.children ? "currentColor" : "none"))
-      .attr("stroke-width", 1)
+      .attr("stroke", "none")
       .attr("cursor", (d) => (d.children ? "pointer" : "default"))
       .on("click", (event, d) => {
         if (d.children) {
