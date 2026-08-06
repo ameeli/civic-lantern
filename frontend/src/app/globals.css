@@ -6,18 +6,24 @@
   --font-headline: var(--font-headline);
   --font-sans: var(--font-geist-sans);
 
-  /* Colors */
   --color-ink: #2c2825;
   --color-wood-mid: #6d4c32;
   --color-lantern-light: #ffeba066;
   --color-lantern-core: #fffadcb3;
   --color-lantern-amber: #e8961e;
-  --color-party-dem: #274156;
-  --color-party-rep: #8c2d2d;
-  --color-party-neutral: #c69214
-  ;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Party Colors */
+  --color-party-dem: #1b3344;
+  --color-party-rep: #6e1e1e;
+  --color-party-neutral: #996f1d;
+
+  /* Office Colors */
+  --color-office-president: #996f1d;
+  --color-office-senate: #4a233e;
+  --color-office-house: #284234;
 }
 
 /* :root {
@@ -40,6 +46,9 @@ body {
 .fill-party-dem { fill: var(--color-party-dem); }
 .fill-party-rep { fill: var(--color-party-rep); }
 .fill-party-neutral { fill: var(--color-party-neutral); }
+.fill-office-president { fill: var(--color-office-president); }
+.fill-office-senate { fill: var(--color-office-senate); }
+.fill-office-house { fill: var(--color-office-house); }
 
 @utility bg-dark-wood {
   background-color: var(--color-wood-mid);

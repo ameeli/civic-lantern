@@ -28,6 +28,13 @@ function partyClass(party: string | null): string {
   return "fill-party-neutral";
 }
 
+function officeClass(office: string): string {
+  if (office === "House") return "fill-office-house";
+  if (office === "Senate") return "fill-office-senate";
+  if (office === "Presidential") return "fill-office-president";
+  return "fill-party-neutral";
+}
+
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
@@ -134,9 +141,11 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .data(packRoot.descendants())
       .join("circle")
       .attr("fill", (d) => (d.children ? "none" : "currentColor"))
-      .attr("class", (d) =>
-        d.depth === 2 ? partyClass((d.data as CandidateNode).party) : null,
-      )
+      .attr("class", (d) => {
+        if (d.depth === 1) return officeClass((d.data as RaceNode).name);
+        if (d.depth === 2) return partyClass((d.data as CandidateNode).party);
+        return null;
+      })
       .attr("stroke", (d) => (d.children ? "currentColor" : "none"))
       .attr("stroke-width", 1)
       .attr("cursor", (d) => (d.children ? "pointer" : "default"))
@@ -150,7 +159,11 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     const label = svg
       .append("g")
       .selectAll<SVGTextElement, PackNode>("text")
-      .data(packRoot.descendants().filter((d) => d.depth === 1 || d.depth === 2 || d.depth === 3))
+      .data(
+        packRoot
+          .descendants()
+          .filter((d) => d.depth === 1 || d.depth === 2 || d.depth === 3),
+      )
       .join("text")
       .attr("text-anchor", "middle")
       .attr("pointer-events", "none");
@@ -168,9 +181,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const k = width / v[2];
       const translate = (d: PackNode) =>
         `translate(${(d.x - v[0]) * k + width / 2},${(d.y - v[1]) * k + height / 2})`;
-      node
-        .attr("transform", translate)
-        .attr("r", (d) => d.r * k);
+      node.attr("transform", translate).attr("r", (d) => d.r * k);
       label
         .attr("transform", translate)
         .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)));
