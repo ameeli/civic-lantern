@@ -6,55 +6,51 @@
   --font-headline: var(--font-headline);
   --font-sans: var(--font-geist-sans);
 
-  --color-ink: #2c2825;
-  --color-wood-mid: #6d4c32;
-  --color-lantern-light: #ffeba066;
-  --color-lantern-core: #fffadcb3;
+  /* PRIMITIVE COLOR TOKENS */
+  --color-ink-dark:      #2c2825;
+  --color-wood-amber:    #6d4c32;
+  --color-gold-heritage: #996f1d;
+  --color-navy-library:  #1b3344;
+  --color-red-wax:       #6e1e1e;
+  --color-plum-shadow:   #4a233e;
+  --color-green-spruce:  #284234;
+  --color-gold-glow: #ffeba066;
+  --color-cream-glow:  #fffadcb3;
   --color-lantern-amber: #e8961e;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Brand & Surfaces */
+  --color-ink:           var(--color-ink-dark);
+  --color-wood-mid:      var(--color-wood-amber);
 
-  /* Party Colors */
-  --color-party-dem: #1b3344;
-  --color-party-rep: #6e1e1e;
-  --color-party-neutral: #996f1d;
+  --color-background:    var(--background);
+  --color-foreground:    var(--foreground);
 
-  /* Office Colors */
-  --color-office-president: #996f1d;
-  --color-office-senate: #4a233e;
-  --color-office-house: #284234;
+  /* Political Parties */
+  --color-party-dem:     var(--color-navy-library);
+  --color-party-rep:     var(--color-red-wax);
+  --color-party-neutral: var(--color-gold-heritage);
+
+  /* Government Offices */
+  --color-office-president: var(--color-gold-heritage);
+  --color-office-senate:    var(--color-plum-shadow);
+  --color-office-house:     var(--color-green-spruce);
 }
 
-/* :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    min-height: 100vh;
   }
-} */
-
-body {
-  @apply bg-background text-foreground;
-  font-family: var(--font-sans);
 }
 
-.fill-party-dem { fill: var(--color-party-dem); }
-.fill-party-rep { fill: var(--color-party-rep); }
-.fill-party-neutral { fill: var(--color-party-neutral); }
-.fill-office-president { fill: var(--color-office-president); }
-.fill-office-senate { fill: var(--color-office-senate); }
-.fill-office-house { fill: var(--color-office-house); }
-
+/* CUSTOM UTILITIES */
 @utility bg-dark-wood {
   background-color: var(--color-wood-mid);
   background-image:
-    radial-gradient(circle at 50% 0%, var(--color-lantern-core) 0%, transparent 30%),
-    radial-gradient(circle at 50% 0%, var(--color-lantern-light) 0%, transparent 90%),
+    radial-gradient(circle at 50% 0%, var(--color-cream-glow) 0%, transparent 30%),
+    radial-gradient(circle at 50% 0%, var(--color-gold-glow) 0%, transparent 90%),
     radial-gradient(ellipse at 50% 0%, transparent 40%, rgba(0, 0, 0, 0.4) 110%),
     url('/wood-texture.webp');
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
