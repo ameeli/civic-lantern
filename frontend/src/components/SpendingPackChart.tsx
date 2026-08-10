@@ -42,8 +42,40 @@ function spendingClass(name: string): string {
   return "fill-party-neutral";
 }
 
+function spendingLabel(name: string): string {
+  if (name === "Inside") return "Direct Campaign Spending";
+  if (name === "Outside Support") return "Independent Support";
+  if (name === "Outside Oppose") return "Independent Opposition";
+  return name;
+}
+
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
+
+function wrapWords(
+  el: d3.Selection<SVGTextElement, unknown, null, undefined>,
+  words: string[],
+  maxWidth: number,
+  virtualFontSize: number,
+): string[] {
+  const scratch = el.append("tspan").attr("font-size", virtualFontSize);
+  const lines: string[] = [];
+  let currentWords: string[] = [];
+  for (const word of words) {
+    const candidate = [...currentWords, word].join(" ");
+    scratch.text(candidate);
+    const width = scratch.node()?.getComputedTextLength() ?? 0;
+    if (width > maxWidth && currentWords.length > 0) {
+      lines.push(currentWords.join(" "));
+      currentWords = [word];
+    } else {
+      currentWords.push(word);
+    }
+  }
+  if (currentWords.length > 0) lines.push(currentWords.join(" "));
+  scratch.remove();
+  return lines;
+}
 
 function wrapLabel(
   selection: d3.Selection<SVGTextElement, PackNode, SVGGElement, unknown>,
@@ -51,8 +83,6 @@ function wrapLabel(
   selection.each(function (d) {
     const el = d3.select(this);
     el.text(null);
-
-    const words = d.data.name.split(/\s+/).filter(Boolean);
 
     // Virtual (uncapped) font-size ratio: same 0.25 factor setView uses to
     // render, but without the 16px cap and without the k multiplier. Always
@@ -62,24 +92,16 @@ function wrapLabel(
     const virtualFontSize = d.r * 0.25;
     const maxWidth = d.r * 1.6;
 
-    const scratch = el.append("tspan").attr("font-size", virtualFontSize);
-    const lines: string[] = [];
-    let currentWords: string[] = [];
-    for (const word of words) {
-      const candidate = [...currentWords, word].join(" ");
-      scratch.text(candidate);
-      const width = scratch.node()?.getComputedTextLength() ?? 0;
-      if (width > maxWidth && currentWords.length > 0) {
-        lines.push(currentWords.join(" "));
-        currentWords = [word];
-      } else {
-        currentWords.push(word);
-      }
-    }
-    if (currentWords.length > 0) lines.push(currentWords.join(" "));
-    scratch.remove();
+    const displayName =
+      d.depth === 3 ? spendingLabel(d.data.name) : d.data.name;
+    const nameLines = wrapWords(
+      el,
+      displayName.split(/\s+/).filter(Boolean),
+      maxWidth,
+      virtualFontSize,
+    );
 
-    const allLines = [...lines, formatDollars(d.value ?? 0)];
+    const allLines = [...nameLines, formatDollars(d.value ?? 0)];
     const lineHeight = 1.1;
     const startDy = -((allLines.length - 1) / 2) * lineHeight;
 
