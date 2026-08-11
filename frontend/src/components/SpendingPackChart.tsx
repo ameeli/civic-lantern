@@ -84,11 +84,6 @@ function wrapLabel(
     const el = d3.select(this);
     el.text(null);
 
-    // Virtual (uncapped) font-size ratio: same 0.25 factor setView uses to
-    // render, but without the 16px cap and without the k multiplier. Always
-    // >= the real rendered ratio (min(0.25, 16/(d.r*k))) for any zoom level,
-    // so wrapping against it is the worst-case bound and stays valid at
-    // every future zoom level without re-wrapping on each tick.
     const virtualFontSize = d.r * 0.25;
     const maxWidth = d.r * 1.6;
 
@@ -114,7 +109,7 @@ function wrapLabel(
       })),
     ];
     const lineHeight = 1.1;
-    const groupGap = 0.4; // extra spacing between the dollar amount and the label below it
+    const groupGap = 0.4;
     const totalSpan = (allLines.length - 1) * lineHeight + groupGap;
     const startDy = -totalSpan / 2;
 
@@ -229,8 +224,14 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const k = width / v[2];
       const translate = (d: PackNode) =>
         `translate(${(d.x - v[0]) * k + width / 2},${(d.y - v[1]) * k + height / 2})`;
-      node.attr("transform", translate).attr("r", (d) => d.r * k);
-      label
+
+      // Only update visible layer
+      const activeDepth = (focusRef.current?.depth ?? -1) + 1;
+      const visibleNode = node.filter((d) => d.depth === activeDepth);
+      const visibleLabel = label.filter((d) => d.depth === activeDepth);
+
+      visibleNode.attr("transform", translate).attr("r", (d) => d.r * k);
+      visibleLabel
         .attr("transform", translate)
         .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)));
     }
