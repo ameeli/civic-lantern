@@ -14,7 +14,10 @@ export default async function SpendingPackChartSection({
   });
   // console.log("items:", items);
   return (
-    <div className="col-span-12 sm:col-span-12 lg:col-span-7">
+    <div className="col-span-12 sm:col-span-12 lg:col-span-7 space-y-3">
+      <h1 className="font-headline font-semibold text-2xl text-center">
+        SPENDING BREAKDOWNS
+      </h1>
       <SpendingPackChart data={items} />
     </div>
   );
