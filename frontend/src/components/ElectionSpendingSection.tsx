@@ -89,6 +89,13 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
           they often operate in ways that closely mirror them, funding
           aggressive ads and outreach. This allows massive, unregulated wealth
           to shape elections from the outside.
+          <br />
+          <br />
+          Independent expenditures can be in the form of{" "}
+          <strong className="font-bold italic">independent support</strong>{" "}
+          (outside ads & mailers advocating for the candidate) or{" "}
+          <strong className="font-bold italic">independent opposition</strong>{" "}
+          (outside ads & mailers attacking the candidate).
         </SpendingCategory>
       </div>
     </div>
