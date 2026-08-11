@@ -101,15 +101,34 @@ function wrapLabel(
       virtualFontSize,
     );
 
-    const allLines = [...nameLines, formatDollars(d.value ?? 0)];
+    const allLines = [
+      {
+        text: formatDollars(d.value ?? 0),
+        class: "font-sans font-medium",
+        sizeEm: 1.25,
+      },
+      ...nameLines.map((text) => ({
+        text,
+        class: "font-headline font-medium italic",
+        sizeEm: 1,
+      })),
+    ];
     const lineHeight = 1.1;
-    const startDy = -((allLines.length - 1) / 2) * lineHeight;
+    const groupGap = 0.4; // extra spacing between the dollar amount and the label below it
+    const totalSpan = (allLines.length - 1) * lineHeight + groupGap;
+    const startDy = -totalSpan / 2;
 
     allLines.forEach((line, i) => {
+      let dy = lineHeight;
+      if (i === 0) dy = startDy;
+      else if (i === 1) dy = lineHeight + groupGap;
+
       el.append("tspan")
         .attr("x", 0)
-        .attr("dy", `${i === 0 ? startDy : lineHeight}em`)
-        .text(line);
+        .attr("dy", `${dy}em`)
+        .attr("class", line.class)
+        .attr("font-size", `${line.sizeEm}em`)
+        .text(line.text);
     });
   });
 }
