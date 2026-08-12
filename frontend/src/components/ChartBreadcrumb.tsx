@@ -10,7 +10,7 @@ export default function ChartBreadcrumb({
   onNavigate,
 }: ChartBreadcrumbProps) {
   return (
-    <nav className="flex items-center gap-1 text-sm font-headline italic ink-press">
+    <nav className="flex items-center gap-1 text-sm font-headline font-medium italic">
       {path.map((segment, i) => (
         <span key={i} className="flex items-center gap-1">
           {i > 0 && <span className="opacity-40">→</span>}
