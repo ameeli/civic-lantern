@@ -12,12 +12,8 @@ export default async function SpendingPackChartSection({
     order: "desc",
     limit: 500,
   });
-  // console.log("items:", items);
   return (
-    <div className="col-span-12 sm:col-span-12 lg:col-span-7 space-y-3">
-      <h1 className="font-headline font-semibold text-2xl text-center">
-        SPENDING BREAKDOWNS
-      </h1>
+    <div className="col-span-12 sm:col-span-12 lg:col-span-8 pl-6 pt-2.5">
       <SpendingPackChart data={items} />
     </div>
   );
