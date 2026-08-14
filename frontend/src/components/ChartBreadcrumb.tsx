@@ -10,15 +10,34 @@ export default function ChartBreadcrumb({
   onNavigate,
 }: ChartBreadcrumbProps) {
   return (
-    <nav className="flex items-center gap-1 text-sm font-headline font-medium italic">
-      {path.map((segment, i) => (
-        <span key={i} className="flex items-center gap-1">
-          {i > 0 && <span className="opacity-40">→</span>}
-          <button onClick={() => onNavigate(i)} className="hover:underline">
-            {segment}
+    <nav className="flex items-center text-sm font-headline font-bold italic">
+      {path.map((segment, i) => {
+        const isLast = i === path.length - 1;
+        const base =
+          "crumb-shape pl-5 pr-5 py-1.5 bg-[var(--color-ink)]/20 text-breadcrumb-text";
+
+        if (isLast) {
+          return (
+            <span key={i} className={base}>
+              <span className="block max-w-[min(45vw,220px)] truncate">
+                {segment}
+              </span>
+            </span>
+          );
+        }
+
+        return (
+          <button
+            key={i}
+            onClick={() => onNavigate(i)}
+            className={`${base} cursor-pointer hover:bg-(--color-ink)/40`}
+          >
+            <span className="block max-w-[min(45vw,220px)] truncate">
+              {segment}
+            </span>
           </button>
-        </span>
-      ))}
+        );
+      })}
     </nav>
   );
 }

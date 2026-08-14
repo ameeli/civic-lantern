@@ -17,10 +17,15 @@
   --color-gold-glow: #ffeba066;
   --color-cream-glow:  #fffadcb3;
   --color-lantern-amber: #e8961e;
+  --color-cream-solid:   #fffadc;
 
   /* Brand & Surfaces */
+  --background:          var(--color-wood-amber);
+  --foreground:          var(--color-ink-dark);
+
   --color-ink:           var(--color-ink-dark);
   --color-wood-mid:      var(--color-wood-amber);
+  --color-breadcrumb-text: var(--color-ink-dark);
 
   --color-background:    var(--background);
   --color-foreground:    var(--foreground);
@@ -90,4 +95,26 @@
   text-align: justify;
   font-size: 0.8rem;
   line-height: 1.15;
+}
+
+@utility crumb-shape {
+  --crumb-arrow: 12px;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--crumb-arrow)) 0,
+    100% 50%,
+    calc(100% - var(--crumb-arrow)) 100%,
+    0 100%,
+    var(--crumb-arrow) 50%
+  );
+  transition: background-color 150ms ease-out;
+
+  &:not(:first-child) {
+    margin-left: calc(-1 * var(--crumb-arrow));
+    background-image: linear-gradient(
+      to right,
+      rgba(44, 40, 37, 0.35),
+      transparent calc(var(--crumb-arrow) * 1.6)
+    );
+  }
 }
