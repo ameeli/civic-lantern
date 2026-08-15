@@ -297,11 +297,11 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   }
 
   return (
-    <div className="w-full mx-auto" style={{ maxWidth: "800px" }}>
+    <div className="relative w-full mx-auto" style={{ maxWidth: "800px" }}>
       <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
       <div
         ref={containerRef}
-        className="w-full"
+        className="w-[85%] mx-auto"
         style={{ aspectRatio: "1 / 1" }}
       >
         <svg ref={svgRef} width={width} height={height} />
