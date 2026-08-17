@@ -209,7 +209,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       )
       .join("text")
       .attr("text-anchor", "middle")
-      .attr("pointer-events", "none");
+      .attr("pointer-events", "none")
+      .attr("fill", "var(--color-ink)");
 
     wrapLabel(label);
 
@@ -221,7 +222,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
 
     function setView(v: [number, number, number]) {
       view = v;
-      const k = width / v[2];
+      const k = Math.min(width, height) / v[2];
       const translate = (d: PackNode) =>
         `translate(${(d.x - v[0]) * k + width / 2},${(d.y - v[1]) * k + height / 2})`;
 
