@@ -104,7 +104,7 @@ function wrapLabel(
       },
       ...nameLines.map((text) => ({
         text,
-        class: "font-headline font-medium italic",
+        class: "font-headline font-medium font-semibold",
         sizeEm: 1,
       })),
     ];
@@ -302,7 +302,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
       <div
         ref={containerRef}
-        className="w-[90%] mx-auto"
+        className="w-[85%] mx-auto"
         style={{ aspectRatio: "1 / 1" }}
       >
         <svg ref={svgRef} width={width} height={height} />
