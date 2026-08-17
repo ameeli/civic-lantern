@@ -60,7 +60,7 @@
     url('/wood-texture.webp');
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-position: 50% 0%, 50% 0%, center, top left;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 250px 250px;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 500px 500px;
 }
 
 @utility ink-press {
