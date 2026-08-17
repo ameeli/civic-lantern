@@ -29,6 +29,23 @@ async function OutsideTotal({ cycle }: { cycle: number }) {
   );
 }
 
+function IndependentExpenditureTypes() {
+  return (
+    <section className="space-y-2">
+      <h3 className="font-headline text-sm font-semibold">
+        The Two Main Types of Independent Expenditures
+      </h3>
+      <p className="text-body-justify">
+        <strong className="font-bold">Independent Support </strong>
+        Appears in the form of outside ads & mailers supporting the candidate.
+        <br />
+        <strong className="font-bold">Independent Opposition </strong>
+        Appears in the form of outside ads & mailers attacking the candidate.
+      </p>
+    </section>
+  );
+}
+
 function SpendingCategory({
   total,
   heading,
@@ -42,8 +59,8 @@ function SpendingCategory({
     <div>
       <Suspense fallback="—">{total}</Suspense>
       <div className="-mt-1">
-        <section className="space-y-4">
-          <h3 className="font-headline text-sm font-medium italic text-center">
+        <section className="space-y-2">
+          <h3 className="font-headline text-sm font-semibold text-center">
             {heading}
           </h3>
           <p className="text-body-justify">{children}</p>
@@ -56,10 +73,10 @@ function SpendingCategory({
 export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
   return (
     <div className="col-span-12 sm:col-span-12 lg:col-span-4 space-y-3 px-2">
-      <h1 className="font-headline font-semibold text-xl text-center">
+      <h1 className="font-headline font-extrabold text-xl text-center">
         FEDERAL ELECTIONS SPENDING
       </h1>
-      <div className="space-y-5">
+      <div className="space-y-3">
         <SpendingCategory
           total={<InsideDisbursements cycle={cycle} />}
           heading="Direct Campaign Spending"
@@ -81,7 +98,7 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
         >
           This is money spent by outside groups to influence an election. Unlike
           candidate fundraising, there are no limits on how much these groups
-          can raise or spend — meaning corporations, billionaires, or special
+          can raise or spend. This means corporations, billionaires, or special
           interests can pour in millions to support or attack a candidate.
           <br />
           <br />
@@ -89,14 +106,8 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
           they often operate in ways that closely mirror them, funding
           aggressive ads and outreach. This allows massive, unregulated wealth
           to shape elections from the outside.
-          <br />
-          <br />
-          Independent expenditures can be in the form of{" "}
-          <strong className="font-bold italic">independent support</strong>{" "}
-          (outside ads & mailers advocating for the candidate) or{" "}
-          <strong className="font-bold italic">independent opposition</strong>{" "}
-          (outside ads & mailers attacking the candidate).
         </SpendingCategory>
+        <IndependentExpenditureTypes />
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ const masthead = Eagle_Lake({
 const headline = Playfair_Display({
   variable: "--font-headline",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "800"],
   style: ["normal", "italic"],
 });
 
