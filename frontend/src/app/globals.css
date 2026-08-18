@@ -98,7 +98,8 @@
 }
 
 @utility border-ink-thin {
-  border: 1.5px solid color-mix(in srgb, var(--color-ink) 35%, transparent);
+  border: 2px solid color-mix(in srgb, var(--color-ink) 35%, transparent);
+  border-radius: 5px;
 }
 
 @utility crumb-shape {
