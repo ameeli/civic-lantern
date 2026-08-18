@@ -10,7 +10,7 @@ export default function ChartBreadcrumb({
   onNavigate,
 }: ChartBreadcrumbProps) {
   return (
-    <nav className="absolute top-0 z-10 flex w-full justify-center items-center text-sm font-headline font-semibold italic">
+    <nav className="absolute top-1 z-10 flex w-full justify-center items-center text-sm font-headline font-semibold italic">
       {path.map((segment, i) => {
         const isLast = i === path.length - 1;
         const base =

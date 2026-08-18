@@ -97,6 +97,10 @@
   line-height: 1.2;
 }
 
+@utility border-ink-thin {
+  border: 1.5px solid color-mix(in srgb, var(--color-ink) 35%, transparent);
+}
+
 @utility crumb-shape {
   --crumb-arrow: 12px;
   clip-path: polygon(

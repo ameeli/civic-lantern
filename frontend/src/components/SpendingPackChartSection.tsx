@@ -13,7 +13,7 @@ export default async function SpendingPackChartSection({
     limit: 500,
   });
   return (
-    <div className="col-span-12 sm:col-span-12 lg:col-span-8 mt-8 lg:mt-0 pt-2.5">
+    <div className="col-span-12 sm:col-span-12 lg:col-span-8 mt-8 lg:mt-2 pt-2.5 border-ink-thin">
       <SpendingPackChart data={items} />
     </div>
   );

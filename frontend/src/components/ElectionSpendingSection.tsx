@@ -13,7 +13,7 @@ function formatDollars(value: number | null): string {
 async function InsideDisbursements({ cycle }: { cycle: number }) {
   const spending = await getElectionSpendingByCycle(cycle);
   return (
-    <h3 className="text-2xl font-medium text-center">
+    <h3 className="text-2xl font-semibold text-center">
       {formatDollars(spending.total_inside_disbursements)}
     </h3>
   );
@@ -25,7 +25,9 @@ async function OutsideTotal({ cycle }: { cycle: number }) {
     (spending.total_outside_support ?? 0) +
     (spending.total_outside_oppose ?? 0);
   return (
-    <h3 className="text-2xl font-medium text-center">{formatDollars(total)}</h3>
+    <h3 className="text-2xl font-semibold text-center">
+      {formatDollars(total)}
+    </h3>
   );
 }
 
@@ -33,14 +35,14 @@ function IndependentExpenditureTypes() {
   return (
     <section className="space-y-2">
       <h3 className="font-headline text-sm font-semibold">
-        The Two Main Types of Independent Expenditures
+        The Two Types of Independent Expenditures
       </h3>
       <p className="text-body-justify">
-        <strong className="font-bold">Independent Support </strong>
-        Appears in the form of outside ads & mailers supporting the candidate.
+        <strong className="font-bold">Independent Support: </strong>
+        Promotes the candidate's record or platform to build voter approval.
         <br />
-        <strong className="font-bold">Independent Opposition </strong>
-        Appears in the form of outside ads & mailers attacking the candidate.
+        <strong className="font-bold">Independent Opposition: </strong>
+        Attacks the candidate's character or positions to discourage support.
       </p>
     </section>
   );
@@ -57,15 +59,13 @@ function SpendingCategory({
 }) {
   return (
     <div>
-      <Suspense fallback="—">{total}</Suspense>
-      <div className="-mt-1">
-        <section className="space-y-2">
-          <h3 className="font-headline text-sm font-semibold text-center">
-            {heading}
-          </h3>
-          <p className="text-body-justify">{children}</p>
-        </section>
+      <div className="border-ink-thin py-2">
+        <Suspense fallback="—">{total}</Suspense>
+        <h3 className="font-headline text-sm font-semibold text-center">
+          {heading}
+        </h3>
       </div>
+      <p className="text-body-justify mt-2">{children}</p>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
   return (
     <div className="col-span-12 sm:col-span-12 lg:col-span-4 space-y-3 px-2">
       <h1 className="font-headline font-extrabold text-xl text-center">
-        FEDERAL ELECTIONS SPENDING
+        FEDERAL ELECTION SPENDING
       </h1>
       <div className="space-y-3">
         <SpendingCategory
@@ -102,10 +102,10 @@ export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
           interests can pour in millions to support or attack a candidate.
           <br />
           <br />
-          While the groups are legally barred from coordinating with campaigns,
-          they often operate in ways that closely mirror them, funding
-          aggressive ads and outreach. This allows massive, unregulated wealth
-          to shape elections from the outside.
+          Despite strict laws prohibiting direct campaign coordination, these
+          organizations mirror candidate operations with aggressive TV, mail,
+          and digital ad buys. This allows unregulated wealth to shape elections
+          on a massive scale.
         </SpendingCategory>
         <IndependentExpenditureTypes />
       </div>
