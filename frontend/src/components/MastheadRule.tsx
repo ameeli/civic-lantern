@@ -1,8 +1,8 @@
 function Lines({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
-      <div className="border-t-3 border-ink ink-press opacity-80" />
-      <div className="border-t-2 border-ink ink-press opacity-50" />
+      <div className="border-t-3 border-ink ink-press opacity-70 rounded-full" />
+      <div className="border-t-2 border-ink ink-press opacity-35 rounded-full" />
     </div>
   );
 }
