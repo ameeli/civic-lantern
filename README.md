@@ -4,6 +4,8 @@
 
 Civic Lantern is a campaign finance transparency platform that ingests data from the [Federal Election Commission (FEC) API](https://api.open.fec.gov/developers/) and exposes it through a clean REST API. It tracks both inside spending (official candidate disbursements) and outside spending (independent expenditures from Super PACs and dark money groups), making it easy to see who is funding — or targeting — a candidate.
 
+![The Civic Lantern dashboard, showing 2024 direct campaign spending vs. independent expenditures alongside a zoomable pack chart of spending by race](docs/screenshot.jpg)
+
 ---
 
 ## Why This Exists
@@ -19,6 +21,11 @@ civic-lantern/
 ├── backend/        # FastAPI + PostgreSQL data pipeline and REST API
 └── frontend/       # Next.js UI — election spending dashboard
 ```
+
+For setup, schema, and implementation details for each half, see:
+
+- [`backend/README.md`](backend/README.md) — API, database schema, ingestion pipeline
+- [`frontend/README.md`](frontend/README.md) — dashboard structure, data flow, dev commands
 
 ### Backend Stack
 
@@ -82,25 +89,18 @@ All models use a `TimestampMixin` backed by a server-side PostgreSQL trigger. `c
 
 ## API Overview
 
-Base path: `/api/v1`
-
-### Candidates
+Base path: `/api/v1`. All endpoints are read-only (`GET`).
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/candidates` | List candidates — filterable by state, office, election cycle; sortable and paginated |
 | `GET` | `/candidates/{candidate_id}` | Full detail for a single candidate |
-| `GET` | `/candidates/spending` | All candidate spending totals, paginated |
 | `GET` | `/candidates/{candidate_id}/spending` | Spending history across cycles for one candidate |
+| `GET` | `/candidate-spending` | All candidate spending totals for a cycle, sortable and paginated |
+| `GET` | `/election-spending` | All election-level spending summaries |
+| `GET` | `/election-spending/{cycle}` | Spending summary for a specific (even-year) election cycle |
 
-### Elections
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/elections/spending` | All election-level spending summaries |
-| `GET` | `/elections/spending/{cycle}` | Spending summary for a specific election cycle |
-
-Interactive docs available at `/docs` (Swagger UI) when the server is running.
+Interactive docs available at `/docs` (Swagger UI) when the server is running. Full request/response details are in [`backend/README.md`](backend/README.md#api).
 
 ---
 
@@ -114,80 +114,36 @@ Interactive docs available at `/docs` (Swagger UI) when the server is running.
 - Docker (for PostgreSQL)
 - An [FEC API key](https://api.data.gov/signup/) (free)
 
-### Backend
+Clone the repo, then set up each half independently — full steps (env vars, migrations, running the ingestion pipeline, running tests) are in their READMEs:
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/your-username/civic-lantern.git
-cd civic-lantern/backend
-
-# 2. Install dependencies
-poetry install
-
-# 3. Start PostgreSQL
-docker-compose up -d
-
-# 4. Configure environment
-cp .env.example .env
-# Add your FEC_API_KEY and database connection strings to .env
-
-# 5. Apply migrations
-poetry run alembic upgrade head
-
-# 6. Start the server
-poetry run uvicorn civic_lantern.main:app --reload
+cd civic-lantern
 ```
 
-The API will be available at `http://localhost:8000`. Visit `http://localhost:8000/docs` for the interactive API explorer.
-
-### Running the Ingestion Pipeline
-
-```bash
-poetry run python -m civic_lantern.jobs.ingestion
-```
-
-### Frontend
-
-```bash
-cd civic-lantern/frontend
-
-# Install dependencies
-npm install
-
-# Start the dev server
-npm run dev
-```
-
-The UI will be available at `http://localhost:3000`. It expects the backend API to be running at `http://localhost:8000`.
+- **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (`/docs` for the interactive API explorer)
+- **Frontend:** see [`frontend/README.md`](frontend/README.md#local-setup) — runs at `http://localhost:3000`, and needs `NEXT_PUBLIC_API_URL` pointed at the backend above
 
 ---
 
 ## Testing
 
-```bash
-poetry run pytest                     # All tests
-poetry run pytest -m unit             # Unit tests only (no DB required)
-poetry run pytest -m integration      # Integration tests (requires running DB)
-poetry run pytest --cov=civic_lantern # With coverage report
-```
-
-Tests are organized into unit tests (mocked dependencies, httpx via `respx`) and integration tests (real PostgreSQL, real SQLAlchemy sessions). Async support via `pytest-asyncio`.
+Each half has its own test suite — see [`backend/README.md`](backend/README.md#testing) (pytest: unit + integration) and [`frontend/README.md`](frontend/README.md#testing) (Vitest).
 
 ---
 
 ## Data Model
 
-The core tables:
+The core tables (see [`backend/README.md`](backend/README.md#database) for full schema):
 
 | Table | Description |
 |---|---|
 | `candidates` | Candidate records keyed on FEC `candidate_id` |
-| `candidate_spending_totals` | Official disbursements and receipts per candidate per cycle |
-| `schedule_e` | Individual independent expenditure records |
 | `committees` | PAC and committee registrations |
-| `elections` | Election metadata |
-| `election_candidates` | Many-to-many join of candidates to elections |
-| `mv_election_spending_summary` | Materialized view — election-level analytics |
+| `inside_totals_by_candidate` | Candidates' own fundraising (receipts/disbursements) per cycle |
+| `schedule_e_totals_by_candidate` | Independent-expenditure totals per candidate/cycle, split support vs. oppose |
+| `mv_candidate_spending_summary` | Materialized view — per-candidate, per-cycle inside vs. outside totals and influence/vulnerability ratios |
+| `mv_election_spending_summary` | Materialized view — election-level analytics, rolled up from the view above |
 
 ---
 
