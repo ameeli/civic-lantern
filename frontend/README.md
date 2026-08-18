@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Civic Lantern — Frontend
 
-## Getting Started
+## Overview
 
-First, run the development server:
+The frontend is a Next.js dashboard that visualizes campaign finance data
+served by the [backend API](../backend/README.md). For a given election
+cycle it shows the split between direct campaign spending and independent
+("outside") expenditures, and lets you drill into per-candidate spending
+with a zoomable D3 pack chart.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript 5
+- **Styling:** Tailwind CSS 4
+- **Charting:** D3 7 (zoomable circle-pack chart)
+- **Testing:** Vitest + React Testing Library (jsdom environment)
+- **Package manager:** npm
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx   # Root layout: fonts, metadata
+│   └── page.tsx     # Home page — composes the dashboard sections
+├── api/
+│   ├── client.ts    # apiFetch() — thin fetch wrapper around NEXT_PUBLIC_API_URL
+│   └── spending.ts  # Typed calls to /election-spending and /candidate-spending
+├── components/
+│   ├── ElectionSpendingSection.tsx   # Inside vs. outside totals for a cycle (RSC + Suspense)
+│   ├── SpendingPackChartSection.tsx  # Fetches per-candidate spending, renders the pack chart
+│   ├── SpendingPackChart.tsx         # Client component: D3 zoomable circle pack
+│   ├── ChartBreadcrumb.tsx           # Breadcrumb nav for the pack chart drill-down
+│   ├── Gavel.tsx, MastheadRule.tsx, PaperBorder.tsx  # Decorative/layout components
+├── hooks/
+│   └── useChartDimensions.ts  # ResizeObserver-based container sizing for the chart
+├── utils/
+│   └── transformToHierarchy.ts  # Flat candidate spending list -> office/candidate/spending-type hierarchy for d3.pack
+└── types/
+    └── spending.ts  # TypeScript types mirroring the backend's Pydantic response schemas
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Local Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install dependencies**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-## Learn More
+2. **Configure the API URL**
 
-To learn more about Next.js, take a look at the following resources:
+   The app reads `NEXT_PUBLIC_API_URL` (see `src/api/client.ts`) and prefixes
+   every request with it — there's no default, so it must be set. Create
+   `frontend/.env.local`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Start the backend** (see [`../backend/README.md`](../backend/README.md)) so the API is reachable at the URL above.
 
-## Deploy on Vercel
+4. **Start the dev server**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```bash
+   npm run dev
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   The app runs at `http://localhost:3000`.
+
+## How data flows in
+
+- `getElectionSpendingByCycle(cycle)` / `listCandidatesSpending(params)`
+  (`src/api/spending.ts`) call the backend's `/election-spending/{cycle}` and
+  `/candidate-spending` endpoints.
+- `ElectionSpendingSection` and `SpendingPackChartSection` are async React
+  Server Components that fetch data server-side; `ElectionSpendingSection`
+  wraps each metric in its own `<Suspense>` boundary so the two totals load
+  independently.
+- `SpendingPackChartSection` fetches up to 500 candidates for a cycle
+  (sorted by outside spending) and passes them to `SpendingPackChart`, a
+  client component. `transformToHierarchy` buckets candidates by office
+  (President/Senate/House), groups candidates below a $1M outside-spending
+  threshold into an "Others" node per office, and splits each candidate's
+  spending into `Inside` / `Outside Support` / `Outside Oppose` leaves for
+  the D3 pack layout.
+
+## Testing
+
+```bash
+npm run test
+```
+
+Vitest with a jsdom environment and React Testing Library; see
+`src/utils/__tests__/transformToHierarchy.test.ts` for an example.
+
+## Linting
+
+```bash
+npm run lint
+```
+
+## Notes
+
+- `next.config.ts` enables the React Compiler (`reactCompiler: true`).
+- `AGENTS.md`/`CLAUDE.md` flag that this project pins a Next.js version with
+  breaking API/convention changes from what most training data assumes —
+  check `node_modules/next/dist/docs/` before relying on prior Next.js
+  knowledge when working in this codebase.
