@@ -299,7 +299,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
 
   return (
     <div
-      className="relative top-5 w-full mx-auto"
+      className="relative top-2 w-full mx-auto"
       style={{ maxWidth: "800px" }}
     >
       <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />

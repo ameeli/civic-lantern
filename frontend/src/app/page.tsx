@@ -7,13 +7,19 @@ import PaperBorder from "@/components/PaperBorder";
 export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center bg-dark-wood font-sans">
-      <main className="relative isolate grid grid-cols-12 content-start gap-x-6 gap-y-1 w-full max-w-6xl my-2 p-12 lg:p-15">
+      <main className="relative isolate grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-6xl my-2 p-12 lg:p-15">
         <PaperBorder />
         <div className="col-span-12 flex flex-col items-center gap-5 mt-4 lg:mt-0">
           <h1 className="text-masthead text-3xl">The Civic Lantern</h1>
           <MastheadRule>
             <Gavel width={40} height={40} />
           </MastheadRule>
+        </div>
+        <div className="col-span-12 mb-3">
+          <h1 className="font-headline font-semibold text-3xl text-center">
+            Direct vs. Outside Money: Federal Campaign Spending Breakdowns
+            (2024)
+          </h1>
         </div>
         <ElectionSpendingSection cycle={2024} />
         <SpendingPackChartSection cycle={2024} />
