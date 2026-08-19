@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -13,6 +14,12 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Env var takes precedence over the .ini file's hardcoded local dev URL,
+# so `alembic upgrade head` can target prod without editing alembic.ini.
+alembic_db_url = os.environ.get("ALEMBIC_DATABASE_URL")
+if alembic_db_url:
+    config.set_main_option("sqlalchemy.url", alembic_db_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
