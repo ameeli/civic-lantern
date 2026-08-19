@@ -33,8 +33,8 @@ class FECClient:
         self.candidate_url = f"{self.base_url}/candidates/"
         self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
         self.committee_url = f"{self.base_url}/committees/"
-        self.schedule_e_by_candidate_url = (
-            f"{self.base_url}/schedules/schedule_e/by_candidate/"
+        self.schedule_e_totals_by_candidate_url = (
+            f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
         )
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
@@ -191,7 +191,7 @@ class FECClient:
         logger.info(f"✅ Fetched {len(totals)} inside candidate totals")
         return totals
 
-    async def get_outside_spending_totals(
+    async def get_candidate_schedule_e_totals(
         self,
         cycle: int = 2024,
         per_page: int = 100,
@@ -207,27 +207,9 @@ class FECClient:
             **kwargs,
         }
 
-        totals = await self._paginate(self.outside_spending_url, params)
-        logger.info(f"✅ Fetched {len(totals)} outside spending records")
+        totals = await self._paginate(self.schedule_e_totals_by_candidate_url, params)
+        logger.info(f"✅ Fetched {len(totals)} candidate schedule E totals")
         return totals
-
-    async def get_schedule_e_by_candidate(
-        self,
-        cycle: int = 2024,
-        per_page: int = 100,
-        **kwargs,
-    ) -> list[dict]:
-        """Fetch IE totals aggregated by committee and candidate."""
-        params = {
-            "api_key": self.api_key,
-            "cycle": cycle,
-            "per_page": per_page,
-            **kwargs,
-        }
-
-        records = await self._paginate(self.schedule_e_by_candidate_url, params)
-        logger.info(f"✅ Fetched {len(records)} schedule E by candidate records")
-        return records
 
     async def __aenter__(self):
         return self

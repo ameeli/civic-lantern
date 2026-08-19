@@ -16,7 +16,7 @@ class ScheduleETotalsByCandidateIngestor(BaseIngestor):
         """Fetch IE totals per candidate for the given cycle."""
         kwargs.pop("start_date", None)
         kwargs.pop("end_date", None)
-        return await self.client.get_outside_spending_totals(cycle=cycle, **kwargs)
+        return await self.client.get_candidate_schedule_e_totals(cycle=cycle, **kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
         """Validate raw schedule E totals."""

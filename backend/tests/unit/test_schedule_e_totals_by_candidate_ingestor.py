@@ -13,11 +13,11 @@ from civic_lantern.services.data.schedule_e_totals_by_candidate import (
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestScheduleETotalsByCandidateIngestor:
-    async def test_fetch_calls_get_outside_spending_totals(
+    async def test_fetch_calls_get_candidate_schedule_e_totals(
         self, mock_client, mock_session
     ):
-        """fetch() delegates to client.get_outside_spending_totals with correct cycle."""
-        mock_client.get_outside_spending_totals.return_value = [
+        """fetch() delegates to client.get_candidate_schedule_e_totals with correct cycle."""
+        mock_client.get_candidate_schedule_e_totals.return_value = [
             {
                 "candidate_id": "P001",
                 "cycle": 2024,
@@ -31,29 +31,29 @@ class TestScheduleETotalsByCandidateIngestor:
         )
         result = await ingestor.fetch(cycle=2024)
 
-        mock_client.get_outside_spending_totals.assert_awaited_once_with(cycle=2024)
+        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
         assert len(result) == 1
 
     async def test_fetch_strips_date_kwargs(self, mock_client, mock_session):
         """fetch() removes start_date/end_date before passing kwargs to client."""
-        mock_client.get_outside_spending_totals.return_value = []
+        mock_client.get_candidate_schedule_e_totals.return_value = []
 
         ingestor = ScheduleETotalsByCandidateIngestor(
             client=mock_client, session=mock_session
         )
         await ingestor.fetch(cycle=2024, start_date="2024-01-01", end_date="2024-12-31")
 
-        mock_client.get_outside_spending_totals.assert_awaited_once_with(cycle=2024)
+        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
 
     async def test_fetch_default_cycle_is_2024(self, mock_client, mock_session):
-        mock_client.get_outside_spending_totals.return_value = []
+        mock_client.get_candidate_schedule_e_totals.return_value = []
 
         ingestor = ScheduleETotalsByCandidateIngestor(
             client=mock_client, session=mock_session
         )
         await ingestor.fetch()
 
-        mock_client.get_outside_spending_totals.assert_awaited_once_with(cycle=2024)
+        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
 
     @patch(
         "civic_lantern.jobs.ingestors.schedule_e_totals_by_candidate"
