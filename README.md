@@ -32,7 +32,7 @@ For setup, schema, and implementation details for each half, see:
 | Layer | Technology |
 |---|---|
 | API framework | FastAPI |
-| Database | PostgreSQL 15 |
+| Database | PostgreSQL 17 |
 | ORM | SQLAlchemy 2.0 (async) |
 | Validation | Pydantic v2 |
 | Migrations | Alembic |

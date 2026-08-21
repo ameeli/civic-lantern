@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: civic_lantern_db
     restart: unless-stopped
     environment:
@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     # docker volumn created to persist data outside the container lifecycle
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_pg17:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U civic_lantern_user -d civic_lantern_dev"]
       interval: 10s
@@ -21,6 +21,6 @@ services:
       start_period: 10s
 
 volumes:
-  postgres_data:
+  postgres_data_pg17:
   # Implicit. Written for clarity.
     driver: local

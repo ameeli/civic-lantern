@@ -36,7 +36,7 @@ Custom exception hierarchy rooted in `FECException`. Errors are classified as re
 
 ### Database
 
-PostgreSQL 15 via Docker. All models use `TimestampMixin` — a PostgreSQL trigger function `set_updated_at()` handles `updated_at` automatically. `created_at` is preserved during upserts by excluding it from the update set.
+PostgreSQL 17 via Docker. All models use `TimestampMixin` — a PostgreSQL trigger function `set_updated_at()` handles `updated_at` automatically. `created_at` is preserved during upserts by excluding it from the update set.
 
 ## Commands
 

@@ -11,7 +11,7 @@ read-only endpoints over candidate, committee, and campaign-spending data.
 ## Tech Stack
 
 - **Language / Framework:** Python 3.11+, FastAPI
-- **Database:** PostgreSQL 15
+- **Database:** PostgreSQL 17
 - **ORM / Migrations:** SQLAlchemy 2.0 (async) + Alembic
 - **Validation:** Pydantic v2 / pydantic-settings
 - **HTTP client:** httpx, with `aiolimiter` (rate limiting) and `tenacity` (retries)
