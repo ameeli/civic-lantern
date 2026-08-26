@@ -9,11 +9,6 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
-    DB_HOST: str
-    DB_PORT: int
-    DB_USER: str
-    DB_PASSWORD: str
-    DB_NAME: str
     DATABASE_URL_ASYNC: str
     TEST_DATABASE_URL_ASYNC: str
     FEC_API_KEY: str | None = None
