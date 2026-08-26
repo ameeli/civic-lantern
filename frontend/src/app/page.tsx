@@ -4,6 +4,11 @@ import Gavel from "@/components/Gavel";
 import MastheadRule from "@/components/MastheadRule";
 import PaperBorder from "@/components/PaperBorder";
 
+// This page fetches live spending data from an external backend on every
+// load. Prerendering it at build time couples build success to that
+// backend being reachable right then — force per-request rendering instead.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center bg-dark-wood font-sans">
