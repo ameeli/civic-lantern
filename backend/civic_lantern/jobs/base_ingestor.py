@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
@@ -92,11 +92,15 @@ class BaseIngestor(ABC):
 
     async def _resolve_dates(
         self, start_date: Optional[str], end_date: Optional[str]
-    ) -> tuple[str, str]:
+    ) -> tuple[Optional[str], str]:
         """Resume from the last successful run's watermark, in US/Eastern.
 
-        Falls back to a 1-day lookback if no prior successful run exists yet
-        (e.g. the very first invocation for this ingestor).
+        Returns `start_date=None` (no lower bound — a full historical pull)
+        when no prior successful run exists yet. A 1-day lookback would leave
+        a newly-activated cycle's candidate/committee roster incomplete,
+        causing downstream FK violations when spending totals for candidates
+        outside that narrow window are ingested. The full pull only happens
+        once; every subsequent run resumes from the watermark it sets.
         """
         now_et = datetime.now(FEC_TIMEZONE)
         if not end_date:
@@ -105,8 +109,9 @@ class BaseIngestor(ABC):
             watermark = await IngestionRunService(self.session).get_watermark(
                 self.entity_name
             )
-            if watermark:
-                start_date = watermark.astimezone(FEC_TIMEZONE).strftime("%Y-%m-%d")
-            else:
-                start_date = (now_et - timedelta(days=1)).strftime("%Y-%m-%d")
+            start_date = (
+                watermark.astimezone(FEC_TIMEZONE).strftime("%Y-%m-%d")
+                if watermark
+                else None
+            )
         return start_date, end_date

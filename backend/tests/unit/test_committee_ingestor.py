@@ -26,10 +26,10 @@ class TestCommitteeIngestor:
         assert result == [{"committee_id": "C001"}]
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
-    async def test_fetch_without_dates_resolves_watermark(
+    async def test_fetch_without_dates_and_no_watermark_omits_min_date(
         self, MockRunService, mock_client, mock_session
     ):
-        """fetch() without dates resumes from the watermark, not unfiltered."""
+        """No prior run → full historical pull, no min_first_file_date filter."""
         MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
         mock_client.get_committees.return_value = []
 
@@ -37,7 +37,26 @@ class TestCommitteeIngestor:
         await ingestor.fetch()
 
         _, kwargs = mock_client.get_committees.call_args
-        assert "min_first_file_date" in kwargs
+        assert "min_first_file_date" not in kwargs
+        assert "max_first_file_date" in kwargs
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_fetch_without_dates_resumes_from_watermark(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """A prior successful run's watermark becomes the min_first_file_date."""
+        from datetime import datetime, timezone
+
+        MockRunService.return_value.get_watermark = AsyncMock(
+            return_value=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        )
+        mock_client.get_committees.return_value = []
+
+        ingestor = CommitteeIngestor(client=mock_client, session=mock_session)
+        await ingestor.fetch()
+
+        _, kwargs = mock_client.get_committees.call_args
+        assert kwargs["min_first_file_date"] == "2025-12-31"
         assert "max_first_file_date" in kwargs
 
     @patch(

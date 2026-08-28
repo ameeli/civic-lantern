@@ -19,11 +19,12 @@ class CommitteeIngestor(BaseIngestor):
         """Fetch committees from FEC API.
 
         Pass start_date/end_date to filter by first file date explicitly.
-        Omitting either resumes from the last successful run's watermark
-        (or a 1-day lookback on the very first run).
+        Omitting either resumes from the last successful run's watermark, or
+        does a full unfiltered pull on the very first run (no watermark yet).
         """
         start_date, end_date = await self._resolve_dates(start_date, end_date)
-        kwargs["min_first_file_date"] = start_date
+        if start_date:
+            kwargs["min_first_file_date"] = start_date
         kwargs["max_first_file_date"] = end_date
         return await self.client.get_committees(**kwargs)
 

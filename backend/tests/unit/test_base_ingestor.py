@@ -78,10 +78,15 @@ class TestBaseIngestorWorkflow:
         assert result is None
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
-    async def test_default_date_range_uses_eastern_when_no_watermark(
+    async def test_no_watermark_returns_none_start_for_full_pull(
         self, MockRunService, mocker, mock_client, mock_session
     ):
-        """With no prior run, falls back to a 1-day lookback in US/Eastern."""
+        """With no prior run, start_date is None — a full historical pull.
+
+        A 1-day lookback would leave a newly-activated cycle's candidate
+        roster incomplete, causing FK violations when spending totals for
+        candidates outside that narrow window are ingested.
+        """
         MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
 
         fec_tz = ZoneInfo("America/New_York")
@@ -97,7 +102,7 @@ class TestBaseIngestorWorkflow:
 
         start, end = await ingestor._resolve_dates(None, None)
 
-        assert start == "2025-06-14"
+        assert start is None
         assert end == "2025-06-15"
         mock_dt.now.assert_called_once_with(fec_tz)
 
