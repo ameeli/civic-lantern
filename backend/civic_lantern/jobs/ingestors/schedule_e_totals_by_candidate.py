@@ -12,7 +12,7 @@ class ScheduleETotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "schedule_e_totals_by_candidate"
 
-    async def fetch(self, cycle: int = 2024, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def fetch(self, cycle: int, **kwargs: Any) -> List[Dict[str, Any]]:
         """Fetch IE totals per candidate for the given cycle."""
         kwargs.pop("start_date", None)
         kwargs.pop("end_date", None)

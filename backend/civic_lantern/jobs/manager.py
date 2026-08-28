@@ -3,11 +3,21 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
+from civic_lantern.core.cycles import active_cycles
 from civic_lantern.db.session import AsyncSessionLocal
 from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
+from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
 logger = logging.getLogger(__name__)
+
+# Ingested once per run, no cycle parameter (date-windowed).
+DATE_WINDOWED_ENTITIES = ["committees", "candidates"]
+# Looped once per active cycle — cycle-scoped snapshot ingestors.
+SPENDING_ENTITIES = ["inside_totals_by_candidate", "schedule_e_totals_by_candidate"]
+# Comfortably above worst-case run time given the FEC 900/hr rate limit and
+# current dataset size; generous enough not to false-positive on a slow FEC day.
+OVERLAP_TIMEOUT_MINUTES = 180
 
 
 class IngestionManager:
@@ -93,11 +103,35 @@ class IngestionManager:
         }
         ran = spending_ingestors & set(targets)
         any_succeeded = any(
-            results.get(name) and "error" not in results.get(name, {})
-            for name in ran
+            results.get(name) and "error" not in results.get(name, {}) for name in ran
         )
         if any_succeeded:
             await self.refresh_spending_stats()
+
+        return results
+
+    async def run_nightly(self) -> Dict[str, Any]:
+        """Run the full nightly ingestion routine.
+
+        Date-windowed entities (committees, candidates) run once, resuming
+        from their watermark. The two spending-totals ingestors run once per
+        active cycle (2024 onward), since they're cycle-scoped snapshots
+        rather than date-windowed. Guards against overlapping runs: a recent
+        in-progress run blocks this one; a stale one self-heals first.
+        """
+        async with AsyncSessionLocal() as session:
+            guard = IngestionRunService(session)
+            if await guard.has_active_run(OVERLAP_TIMEOUT_MINUTES):
+                logger.warning("Overlap guard: a run is already in progress, skipping.")
+                return {"skipped": "overlap_guard"}
+            await guard.reset_stale_runs(OVERLAP_TIMEOUT_MINUTES)
+
+        results: Dict[str, Any] = {}
+        results.update(await self.ingest_batch(DATE_WINDOWED_ENTITIES))
+
+        for cycle in active_cycles():
+            cycle_results = await self.ingest_batch(SPENDING_ENTITIES, cycle=cycle)
+            results.update({f"{name}:{cycle}": r for name, r in cycle_results.items()})
 
         return results
 
@@ -125,5 +159,7 @@ class IngestionManager:
                 await session.commit()
                 logger.info("✅ Materialized views refreshed.")
             except Exception as e:
-                logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to refresh materialized views: {e}", exc_info=True
+                )
                 await session.rollback()

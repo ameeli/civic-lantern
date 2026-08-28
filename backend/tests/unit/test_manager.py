@@ -3,7 +3,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from sqlalchemy import TextClause
 
-from civic_lantern.jobs.manager import IngestionManager
+from civic_lantern.jobs.manager import (
+    DATE_WINDOWED_ENTITIES,
+    OVERLAP_TIMEOUT_MINUTES,
+    SPENDING_ENTITIES,
+    IngestionManager,
+)
 
 
 @pytest.mark.unit
@@ -121,7 +126,10 @@ class TestIngestionManager:
         calls = [str(c.args[0]) for c in mock_session.execute.call_args_list]
         assert any("mv_candidate_spending_summary" in c for c in calls)
         assert any("mv_election_spending_summary" in c for c in calls)
-        assert all(isinstance(c.args[0], TextClause) for c in mock_session.execute.call_args_list)
+        assert all(
+            isinstance(c.args[0], TextClause)
+            for c in mock_session.execute.call_args_list
+        )
 
     @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
     async def test_ingest_batch_refreshes_mv_on_spending_success(
@@ -163,3 +171,75 @@ class TestIngestionManager:
                 await manager.ingest_batch()
 
         mock_refresh.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestRunNightly:
+    """Test the nightly routine: overlap guard, then per-cycle spending loop."""
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_skips_when_overlap_guard_active(
+        self, MockRunService, MockSession, manager
+    ):
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=True)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        with patch.object(
+            manager, "ingest_batch", new_callable=AsyncMock
+        ) as mock_ingest_batch:
+            result = await manager.run_nightly()
+
+        assert result == {"skipped": "overlap_guard"}
+        mock_ingest_batch.assert_not_awaited()
+        MockRunService.return_value.reset_stale_runs.assert_not_awaited()
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_resets_stale_runs_when_no_active_run(
+        self, MockRunService, MockSession, manager
+    ):
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=False)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        with patch.object(
+            manager, "ingest_batch", new_callable=AsyncMock, return_value={}
+        ):
+            with patch("civic_lantern.jobs.manager.active_cycles", return_value=[]):
+                await manager.run_nightly()
+
+        MockRunService.return_value.reset_stale_runs.assert_awaited_once_with(
+            OVERLAP_TIMEOUT_MINUTES
+        )
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_runs_date_windowed_once_and_spending_per_active_cycle(
+        self, MockRunService, MockSession, manager
+    ):
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=False)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        calls = []
+
+        async def fake_ingest_batch(entities, *args, **kwargs):
+            calls.append((entities, kwargs.get("cycle")))
+            return {name: {"inserted": 1} for name in entities}
+
+        with patch.object(manager, "ingest_batch", side_effect=fake_ingest_batch):
+            with patch(
+                "civic_lantern.jobs.manager.active_cycles", return_value=[2024, 2026]
+            ):
+                result = await manager.run_nightly()
+
+        assert calls[0] == (DATE_WINDOWED_ENTITIES, None)
+        assert calls[1] == (SPENDING_ENTITIES, 2024)
+        assert calls[2] == (SPENDING_ENTITIES, 2026)
+
+        assert "committees" in result
+        assert "inside_totals_by_candidate:2024" in result
+        assert "schedule_e_totals_by_candidate:2026" in result

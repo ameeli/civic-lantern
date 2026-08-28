@@ -128,6 +128,20 @@ class TestFECClientErrorHandling:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+class TestFECClientRequiresExplicitCycle:
+    """Spending-totals endpoints no longer silently default to cycle=2024."""
+
+    async def test_get_candidate_totals_without_cycle_raises(self, client):
+        with pytest.raises(TypeError):
+            await client.get_candidate_totals()
+
+    async def test_get_candidate_schedule_e_totals_without_cycle_raises(self, client):
+        with pytest.raises(TypeError):
+            await client.get_candidate_schedule_e_totals()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 class TestFECClientRateLimiting:
     """Test that both rate limiters are acquired on every request."""
 
