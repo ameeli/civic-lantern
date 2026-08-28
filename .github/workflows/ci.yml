@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: civic_lantern_user
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: civic_lantern_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_ASYNC: postgresql+asyncpg://civic_lantern_user:devpassword123@localhost:5432/civic_lantern_dev
+      TEST_DATABASE_URL_ASYNC: postgresql+asyncpg://civic_lantern_user:devpassword123@localhost:5432/civic_lantern_dev
+      FEC_API_KEY: unused-in-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install poetry
+      - run: poetry install --no-interaction --no-ansi
+      - run: poetry run pytest
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
