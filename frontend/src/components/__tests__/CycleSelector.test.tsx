@@ -4,10 +4,12 @@ import { afterEach } from "vitest";
 import CycleSelector from "@/components/CycleSelector";
 
 const push = vi.fn();
+let mockSearchParamsString = "";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
   usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(mockSearchParamsString),
 }));
 
 afterEach(() => {
@@ -17,6 +19,7 @@ afterEach(() => {
 describe("CycleSelector", () => {
   beforeEach(() => {
     push.mockClear();
+    mockSearchParamsString = "";
   });
 
   it("renders one option per cycle, in the given order", () => {
@@ -47,5 +50,20 @@ describe("CycleSelector", () => {
     fireEvent.change(select, { target: { value: "2024" } });
 
     expect(push).toHaveBeenCalledWith("/?cycle=2024");
+  });
+
+  it("preserves other existing search params when the cycle changes", () => {
+    mockSearchParamsString = "cycle=2026&ref=share-link";
+    const { container } = render(
+      <CycleSelector cycles={[2026, 2024]} selectedCycle={2026} />,
+    );
+    const select = container.querySelector("select") as HTMLSelectElement;
+
+    fireEvent.change(select, { target: { value: "2024" } });
+
+    const [url] = push.mock.calls[0];
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("cycle")).toBe("2024");
+    expect(params.get("ref")).toBe("share-link");
   });
 });

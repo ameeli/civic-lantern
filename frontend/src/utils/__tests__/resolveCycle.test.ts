@@ -26,4 +26,17 @@ describe("resolveCycle", () => {
     expect(resolveCycle("2024", [])).toBeUndefined();
     expect(resolveCycle(undefined, [])).toBeUndefined();
   });
+
+  it("falls back on an empty string rather than coercing it to 0", () => {
+    expect(resolveCycle("", [2026, 2024])).toBe(2026);
+  });
+
+  it("falls back on a whitespace-only string", () => {
+    expect(resolveCycle("   ", [2026, 2024])).toBe(2026);
+  });
+
+  it("falls back on a value with leading/trailing whitespace or a sign", () => {
+    expect(resolveCycle(" 2024 ", [2026, 2024])).toBe(2026);
+    expect(resolveCycle("+2024", [2026, 2024])).toBe(2026);
+  });
 });

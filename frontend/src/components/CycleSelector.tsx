@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export default function CycleSelector({
   cycles,
@@ -11,9 +11,12 @@ export default function CycleSelector({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    router.push(`${pathname}?cycle=${e.target.value}`);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("cycle", e.target.value);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   return (

@@ -12,8 +12,12 @@ export function resolveCycle(
 
   if (typeof requestedCycle !== "string") return fallback;
 
-  const parsed = Number(requestedCycle);
-  if (!Number.isInteger(parsed)) return fallback;
+  // Reject anything but a plain run of digits before parsing — Number()
+  // is too permissive for a URL param (coerces "", " ", "+2024", "2024e0"
+  // to valid-looking numbers), which would otherwise pass as "structurally
+  // valid" instead of falling through to the fallback like other garbage.
+  if (!/^\d+$/.test(requestedCycle)) return fallback;
 
+  const parsed = Number(requestedCycle);
   return readyCycles.includes(parsed) ? parsed : fallback;
 }
