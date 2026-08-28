@@ -1,6 +1,7 @@
 from .base import Base, ViewBase
 from .candidate import Candidate
 from .committee import Committee
+from .ingestion_run import IngestionRun, IngestionRunStatus
 from .inside_totals_by_candidate import InsideTotalsByCandidate
 from .mv_candidate_spending_summary import MvCandidateSpendingSummary
 from .mv_election_spending_summary import MvElectionSpendingSummary
@@ -11,6 +12,8 @@ __all__ = [
     "ViewBase",
     "Candidate",
     "Committee",
+    "IngestionRun",
+    "IngestionRunStatus",
     "InsideTotalsByCandidate",
     "ScheduleETotalsByCandidate",
     "MvCandidateSpendingSummary",

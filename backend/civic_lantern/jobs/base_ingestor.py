@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.services.data.base import BaseService
+from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
 # FEC operates on the US/Eastern filing calendar
@@ -30,18 +31,28 @@ class BaseIngestor(ABC):
         self,
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
-        """Execute the ingestion pipeline: fetch → transform → upsert."""
+        """Execute the ingestion pipeline: fetch → transform → upsert.
+
+        Tracks the attempt in `ingestion_runs`, keyed by (entity_name, cycle).
+        `cycle` is None for date-windowed ingestors (candidates, committees)
+        and an int for the two cycle-scoped spending ingestors.
+        """
         self.logger.info(f"Syncing {self.entity_name}")
 
-        raw_data = await self.fetch(**kwargs)
-        transformed = self.transform(raw_data)
+        cycle = kwargs.get("cycle")
+        run_tracker = IngestionRunService(self.session)
+        run_row = await run_tracker.start_run(self.entity_name, cycle)
 
-        if not transformed:
-            self.logger.info(f"No {self.entity_name} found to ingest.")
-            return None
-
-        service = self.create_service()
         try:
+            raw_data = await self.fetch(**kwargs)
+            transformed = self.transform(raw_data)
+
+            if not transformed:
+                self.logger.info(f"No {self.entity_name} found to ingest.")
+                await run_tracker.complete_run(run_row, success=True)
+                return None
+
+            service = self.create_service()
             stats = await service.upsert_batch(transformed)
             self.logger.info(
                 f"{self.entity_name} complete: "
@@ -49,11 +60,13 @@ class BaseIngestor(ABC):
                 f"{stats['updated']} updated, "
                 f"{stats['errors']} errors"
             )
+            await run_tracker.complete_run(run_row, success=True)
             return stats
         except Exception as e:
             self.logger.error(
                 f"{self.entity_name} ingestion failed: {e}", exc_info=True
             )
+            await run_tracker.complete_run(run_row, success=False, error_message=str(e))
             raise
 
     @property
@@ -77,13 +90,23 @@ class BaseIngestor(ABC):
         """Return a configured service instance for upserting."""
         ...
 
-    def _resolve_dates(
+    async def _resolve_dates(
         self, start_date: Optional[str], end_date: Optional[str]
     ) -> tuple[str, str]:
-        """Default to last 7 days in US/Eastern (FEC filing calendar)."""
+        """Resume from the last successful run's watermark, in US/Eastern.
+
+        Falls back to a 1-day lookback if no prior successful run exists yet
+        (e.g. the very first invocation for this ingestor).
+        """
         now_et = datetime.now(FEC_TIMEZONE)
-        if not start_date:
-            start_date = (now_et - timedelta(days=1)).strftime("%Y-%m-%d")
         if not end_date:
             end_date = now_et.strftime("%Y-%m-%d")
+        if not start_date:
+            watermark = await IngestionRunService(self.session).get_watermark(
+                self.entity_name
+            )
+            if watermark:
+                start_date = watermark.astimezone(FEC_TIMEZONE).strftime("%Y-%m-%d")
+            else:
+                start_date = (now_et - timedelta(days=1)).strftime("%Y-%m-%d")
         return start_date, end_date

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -25,14 +25,20 @@ class TestCommitteeIngestor:
         )
         assert result == [{"committee_id": "C001"}]
 
-    async def test_fetch_without_dates_omits_date_params(self, mock_client, mock_session):
-        """fetch() without dates passes no date filters to get_committees."""
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_fetch_without_dates_resolves_watermark(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """fetch() without dates resumes from the watermark, not unfiltered."""
+        MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
         mock_client.get_committees.return_value = []
 
         ingestor = CommitteeIngestor(client=mock_client, session=mock_session)
         await ingestor.fetch()
 
-        mock_client.get_committees.assert_awaited_once_with()
+        _, kwargs = mock_client.get_committees.call_args
+        assert "min_first_file_date" in kwargs
+        assert "max_first_file_date" in kwargs
 
     @patch(
         "civic_lantern.jobs.ingestors.committees.transform_committees", autospec=True

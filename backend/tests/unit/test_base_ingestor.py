@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict, List
-from unittest.mock import AsyncMock
-
+from unittest.mock import AsyncMock, patch
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -41,8 +40,12 @@ class FakeIngestor(BaseIngestor):
 class TestBaseIngestorWorkflow:
     """Test the template method workflow in BaseIngestor."""
 
-    async def test_happy_path(self, mock_client, mock_session):
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_happy_path(self, MockRunService, mock_client, mock_session):
         """Fetch → transform → upsert returns stats."""
+        MockRunService.return_value.start_run = AsyncMock(return_value=object())
+        MockRunService.return_value.complete_run = AsyncMock()
+
         ingestor = FakeIngestor(
             client=mock_client,
             session=mock_session,
@@ -55,8 +58,14 @@ class TestBaseIngestorWorkflow:
         assert stats["inserted"] == 1
         assert stats["errors"] == 0
 
-    async def test_empty_transform_returns_none(self, mock_client, mock_session):
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_empty_transform_returns_none(
+        self, MockRunService, mock_client, mock_session
+    ):
         """When transform returns empty list, return None without upserting."""
+        MockRunService.return_value.start_run = AsyncMock(return_value=object())
+        MockRunService.return_value.complete_run = AsyncMock()
+
         ingestor = FakeIngestor(
             client=mock_client,
             session=mock_session,
@@ -68,8 +77,13 @@ class TestBaseIngestorWorkflow:
 
         assert result is None
 
-    async def test_default_date_range_uses_eastern(self, mocker, mock_client, mock_session):
-        """When no dates provided, defaults to last 1 day in US/Eastern."""
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_default_date_range_uses_eastern_when_no_watermark(
+        self, MockRunService, mocker, mock_client, mock_session
+    ):
+        """With no prior run, falls back to a 1-day lookback in US/Eastern."""
+        MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
+
         fec_tz = ZoneInfo("America/New_York")
         fake_now = datetime(2025, 6, 15, 10, 0, tzinfo=fec_tz)
         mock_dt = mocker.patch("civic_lantern.jobs.base_ingestor.datetime")
@@ -81,27 +95,54 @@ class TestBaseIngestorWorkflow:
             session=mock_session,
         )
 
-        start, end = ingestor._resolve_dates(None, None)
+        start, end = await ingestor._resolve_dates(None, None)
 
         assert start == "2025-06-14"
         assert end == "2025-06-15"
-        # Verify now() was called with US/Eastern timezone
         mock_dt.now.assert_called_once_with(fec_tz)
 
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_resolve_dates_uses_watermark_when_present(
+        self, MockRunService, mocker, mock_client, mock_session
+    ):
+        """When a prior successful run exists, resumes from its watermark."""
+        fec_tz = ZoneInfo("America/New_York")
+        watermark = datetime(2025, 6, 10, 8, 0, tzinfo=fec_tz)
+        MockRunService.return_value.get_watermark = AsyncMock(return_value=watermark)
+
+        fake_now = datetime(2025, 6, 15, 10, 0, tzinfo=fec_tz)
+        mock_dt = mocker.patch("civic_lantern.jobs.base_ingestor.datetime")
+        mock_dt.now.return_value = fake_now
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+
+        ingestor = FakeIngestor(client=mock_client, session=mock_session)
+
+        start, end = await ingestor._resolve_dates(None, None)
+
+        assert start == "2025-06-10"
+        assert end == "2025-06-15"
+        MockRunService.return_value.get_watermark.assert_awaited_once_with("fake")
+
     async def test_provided_dates_pass_through(self, mock_client, mock_session):
-        """Explicit dates are not overridden."""
+        """Explicit dates are not overridden, and no watermark lookup happens."""
         ingestor = FakeIngestor(
             client=mock_client,
             session=mock_session,
         )
 
-        start, end = ingestor._resolve_dates("2024-03-01", "2024-09-01")
+        start, end = await ingestor._resolve_dates("2024-03-01", "2024-09-01")
 
         assert start == "2024-03-01"
         assert end == "2024-09-01"
 
-    async def test_upsert_error_propagates(self, mock_client, mock_session):
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_upsert_error_propagates(
+        self, MockRunService, mock_client, mock_session
+    ):
         """Exceptions from upsert_batch bubble up after logging."""
+        MockRunService.return_value.start_run = AsyncMock(return_value=object())
+        MockRunService.return_value.complete_run = AsyncMock()
+
         ingestor = FakeIngestor(
             client=mock_client,
             session=mock_session,
@@ -115,3 +156,74 @@ class TestBaseIngestorWorkflow:
 
         with pytest.raises(Exception, match="DB gone"):
             await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_run_records_start_and_success(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """run() starts a tracked run keyed by (entity_name, cycle) and completes it."""
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=["validated_obj"],
+        )
+
+        await ingestor.run(start_date="2024-01-01", end_date="2024-06-01", cycle=2024)
+
+        mock_tracker.start_run.assert_awaited_once_with("fake", 2024)
+        mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_run_records_failure_with_error_message(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """A failed run is recorded with its error message, then re-raised."""
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=["validated_obj"],
+        )
+        failing_service = AsyncMock()
+        failing_service.upsert_batch.side_effect = Exception("DB gone")
+        ingestor.create_service = lambda: failing_service
+
+        with pytest.raises(Exception, match="DB gone"):
+            await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row, success=False, error_message="DB gone"
+        )
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_run_records_success_even_with_empty_transform(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """An empty-but-valid run (e.g. no new records) still counts as success."""
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=[],
+        )
+
+        result = await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        assert result is None
+        mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)

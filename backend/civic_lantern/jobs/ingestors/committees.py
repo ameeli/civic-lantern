@@ -18,13 +18,13 @@ class CommitteeIngestor(BaseIngestor):
     ) -> List[Dict[str, Any]]:
         """Fetch committees from FEC API.
 
-        Pass start_date/end_date to filter by first file date.
-        Omitting both returns all committees.
+        Pass start_date/end_date to filter by first file date explicitly.
+        Omitting either resumes from the last successful run's watermark
+        (or a 1-day lookback on the very first run).
         """
-        if start_date or end_date:
-            start_date, end_date = self._resolve_dates(start_date, end_date)
-            kwargs["min_first_file_date"] = start_date
-            kwargs["max_first_file_date"] = end_date
+        start_date, end_date = await self._resolve_dates(start_date, end_date)
+        kwargs["min_first_file_date"] = start_date
+        kwargs["max_first_file_date"] = end_date
         return await self.client.get_committees(**kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:

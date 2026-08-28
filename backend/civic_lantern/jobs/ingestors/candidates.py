@@ -18,13 +18,14 @@ class CandidateIngestor(BaseIngestor):
     ) -> List[Dict[str, Any]]:
         """Fetch candidates from FEC API.
 
-        Pass start_date/end_date to filter by first file date.
-        Pass election_year to filter by cycle. Omitting all returns unfiltered results.
+        Pass start_date/end_date to filter by first file date explicitly.
+        Omitting either resumes from the last successful run's watermark
+        (or a 1-day lookback on the very first run). Pass election_year to
+        filter by cycle.
         """
-        if start_date or end_date:
-            start_date, end_date = self._resolve_dates(start_date, end_date)
-            kwargs["min_first_file_date"] = start_date
-            kwargs["max_first_file_date"] = end_date
+        start_date, end_date = await self._resolve_dates(start_date, end_date)
+        kwargs["min_first_file_date"] = start_date
+        kwargs["max_first_file_date"] = end_date
         return await self.client.get_candidates(**kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
