@@ -18,3 +18,12 @@ INGESTOR_REGISTRY: dict[str, Type[BaseIngestor]] = {
     "inside_totals_by_candidate": InsideTotalsByCandidateIngestor,
     "schedule_e_totals_by_candidate": ScheduleETotalsByCandidateIngestor,
 }
+
+# Canonical list of cycle-scoped spending ingestors — a cycle only counts as
+# "ready" (for the frontend cycle selector) once every one of these has
+# succeeded for it. Single source of truth for both the nightly manager's
+# per-cycle loop and the readiness endpoint.
+SPENDING_INGESTOR_NAMES: list[str] = [
+    "inside_totals_by_candidate",
+    "schedule_e_totals_by_candidate",
+]

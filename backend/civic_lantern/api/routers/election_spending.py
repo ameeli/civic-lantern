@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.api.deps import get_db
+from civic_lantern.jobs.ingestors import SPENDING_INGESTOR_NAMES
 from civic_lantern.schemas.election_spending import ElectionSpending
 from civic_lantern.services.data.election_spending import ElectionSpendingService
+from civic_lantern.services.data.ingestion_run import IngestionRunService
 
 router = APIRouter(prefix="/election-spending", tags=["election_spending"])
 
@@ -30,6 +32,19 @@ async def get_election_spending(
     """Fetch election-level spending summaries from the materialized view."""
     service = ElectionSpendingService(db)
     return await service.get_all_spending()
+
+
+@router.get("/cycles", response_model=list[int])
+async def get_ready_election_cycles(
+    db: AsyncSession = Depends(get_db),
+) -> list[int]:
+    """Cycles where every spending ingestor has succeeded, newest first.
+
+    Must be declared before /{cycle} — otherwise Starlette matches "cycles"
+    against that path param and 422s trying to parse it as an int.
+    """
+    service = IngestionRunService(db)
+    return await service.get_ready_cycles(SPENDING_INGESTOR_NAMES)
 
 
 @router.get("/{cycle}", response_model=ElectionSpending)

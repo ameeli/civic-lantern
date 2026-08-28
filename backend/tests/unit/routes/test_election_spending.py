@@ -8,6 +8,7 @@ from civic_lantern.main import app
 from tests.unit.conftest import scalars_all_result, scalars_first_result
 
 ELECTION_SPENDING_URL = str(app.url_path_for("get_election_spending"))
+READY_CYCLES_URL = str(app.url_path_for("get_ready_election_cycles"))
 
 
 def election_spending_by_cycle_url(cycle: int) -> str:
@@ -43,6 +44,35 @@ class TestGetElectionSpending:
         response = await api_client.get(ELECTION_SPENDING_URL)
         assert response.status_code == 200
         assert response.json() == []
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestGetReadyElectionCycles:
+    async def test_returns_ready_cycles_newest_first(self, api_client, mock_session):
+        mock_session.execute.return_value = scalars_all_result([2026, 2024])
+
+        response = await api_client.get(READY_CYCLES_URL)
+
+        assert response.status_code == 200
+        assert response.json() == [2026, 2024]
+
+    async def test_empty_when_no_ready_cycles(self, api_client, mock_session):
+        mock_session.execute.return_value = scalars_all_result([])
+
+        response = await api_client.get(READY_CYCLES_URL)
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    async def test_not_shadowed_by_cycle_path_param(self, api_client, mock_session):
+        """/cycles must not be captured by the /{cycle} route (no 422)."""
+        mock_session.execute.return_value = scalars_all_result([2024])
+
+        response = await api_client.get(READY_CYCLES_URL)
+
+        assert response.status_code == 200
+        assert isinstance(response.json(), list)
 
 
 @pytest.mark.unit

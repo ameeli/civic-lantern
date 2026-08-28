@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from civic_lantern.core.cycles import active_cycles
 from civic_lantern.db.session import AsyncSessionLocal
-from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
+from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY, SPENDING_INGESTOR_NAMES
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Ingested once per run, no cycle parameter (date-windowed).
 DATE_WINDOWED_ENTITIES = ["committees", "candidates"]
 # Looped once per active cycle — cycle-scoped snapshot ingestors.
-SPENDING_ENTITIES = ["inside_totals_by_candidate", "schedule_e_totals_by_candidate"]
+SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
 # Comfortably above worst-case run time given the FEC 900/hr rate limit and
 # current dataset size; generous enough not to false-positive on a slow FEC day.
 OVERLAP_TIMEOUT_MINUTES = 180
@@ -97,11 +97,7 @@ class IngestionManager:
                 results[name] = {"error": str(e)}
 
         # Refresh MVs if any spending source ingestor ran and succeeded.
-        spending_ingestors = {
-            "inside_totals_by_candidate",
-            "schedule_e_totals_by_candidate",
-        }
-        ran = spending_ingestors & set(targets)
+        ran = set(SPENDING_INGESTOR_NAMES) & set(targets)
         any_succeeded = any(
             results.get(name) and "error" not in results.get(name, {}) for name in ran
         )
