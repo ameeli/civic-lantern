@@ -10,6 +10,11 @@ export const listElectionSpending = () => {
   return apiFetch<ElectionSpending[]>("/election-spending");
 };
 
+/** Cycles where every spending ingestor has succeeded, newest first. */
+export const listReadyCycles = () => {
+  return apiFetch<number[]>("/election-spending/cycles");
+};
+
 export const getElectionSpendingByCycle = cache((cycle: number) => {
   return apiFetch<ElectionSpending>(`/election-spending/${cycle}`);
 });
