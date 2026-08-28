@@ -34,26 +34,16 @@ class TestScheduleETotalsByCandidateIngestor:
         mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
         assert len(result) == 1
 
-    async def test_fetch_strips_date_kwargs(self, mock_client, mock_session):
-        """fetch() removes start_date/end_date before passing kwargs to client."""
-        mock_client.get_candidate_schedule_e_totals.return_value = []
-
+    async def test_fetch_without_cycle_raises_type_error(
+        self, mock_client, mock_session
+    ):
+        """fetch() requires an explicit cycle — no more silent default."""
         ingestor = ScheduleETotalsByCandidateIngestor(
             client=mock_client, session=mock_session
         )
-        await ingestor.fetch(cycle=2024, start_date="2024-01-01", end_date="2024-12-31")
 
-        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
-
-    async def test_fetch_default_cycle_is_2024(self, mock_client, mock_session):
-        mock_client.get_candidate_schedule_e_totals.return_value = []
-
-        ingestor = ScheduleETotalsByCandidateIngestor(
-            client=mock_client, session=mock_session
-        )
-        await ingestor.fetch()
-
-        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
+        with pytest.raises(TypeError):
+            await ingestor.fetch()
 
     @patch(
         "civic_lantern.jobs.ingestors.schedule_e_totals_by_candidate"

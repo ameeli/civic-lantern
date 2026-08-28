@@ -27,16 +27,16 @@ class TestInsideTotalsByCandidateIngestor:
         mock_client.get_candidate_totals.assert_awaited_once_with(cycle=2024)
         assert result == [{"candidate_id": "P001", "cycle": 2024}]
 
-    async def test_fetch_default_cycle_is_2024(self, mock_client, mock_session):
-        """fetch() defaults to cycle=2024."""
-        mock_client.get_candidate_totals.return_value = []
-
+    async def test_fetch_without_cycle_raises_type_error(
+        self, mock_client, mock_session
+    ):
+        """fetch() requires an explicit cycle — no more silent default."""
         ingestor = InsideTotalsByCandidateIngestor(
             client=mock_client, session=mock_session
         )
-        await ingestor.fetch()
 
-        mock_client.get_candidate_totals.assert_awaited_once_with(cycle=2024)
+        with pytest.raises(TypeError):
+            await ingestor.fetch()
 
     async def test_fetch_passes_explicit_cycle(self, mock_client, mock_session):
         """fetch() passes the provided cycle through to the client."""

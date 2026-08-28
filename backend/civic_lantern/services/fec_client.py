@@ -172,7 +172,7 @@ class FECClient:
 
     async def get_candidate_totals(
         self,
-        cycle: int = 2024,
+        cycle: int,
         per_page: int = 100,
         office: list[str] = FEDERAL_OFFICES,
         **kwargs,
@@ -193,7 +193,7 @@ class FECClient:
 
     async def get_candidate_schedule_e_totals(
         self,
-        cycle: int = 2024,
+        cycle: int,
         per_page: int = 100,
         office: list[str] = FEDERAL_OFFICES,
         **kwargs,

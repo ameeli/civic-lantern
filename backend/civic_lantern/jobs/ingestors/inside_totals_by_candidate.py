@@ -12,7 +12,7 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "inside_totals_by_candidate"
 
-    async def fetch(self, cycle: int = 2024, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def fetch(self, cycle: int, **kwargs: Any) -> List[Dict[str, Any]]:
         """Fetch inside spending totals for all candidates in the given cycle."""
         return await self.client.get_candidate_totals(cycle=cycle, **kwargs)
 

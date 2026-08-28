@@ -3,11 +3,24 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
+from civic_lantern.core.cycles import active_cycles
 from civic_lantern.db.session import AsyncSessionLocal
-from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY
+from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY, SPENDING_INGESTOR_NAMES
+from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
 logger = logging.getLogger(__name__)
+
+# Ingested once per run, no cycle parameter (date-windowed).
+DATE_WINDOWED_ENTITIES = ["committees", "candidates"]
+# Looped once per active cycle — cycle-scoped snapshot ingestors.
+SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
+# Generous enough to never false-positive on a legitimately slow run — in
+# particular, an ingestor's very first-ever invocation does a full,
+# unfiltered historical pull (see BaseIngestor._resolve_dates) that can take
+# several hours under the FEC 900/hr rate limit. Still self-heals well
+# before the next night's scheduled trigger.
+OVERLAP_TIMEOUT_MINUTES = 720
 
 
 class IngestionManager:
@@ -64,12 +77,19 @@ class IngestionManager:
         entities: Optional[List[str]] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        *,
+        skip_mv_refresh: bool = False,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Run ingestors for the given entities, or all if not specified.
 
         Executes in dependency order. Continues on failure — a failed
         entity is logged and recorded but does not block subsequent ones.
+
+        `skip_mv_refresh` lets a caller defer the MV refresh across several
+        calls (e.g. run_nightly()'s per-cycle loop) so it happens once
+        overall rather than once per call — the MVs span every cycle, so
+        refreshing after each individual cycle is redundant work.
         """
         if entities:
             registry_keys = list(INGESTOR_REGISTRY.keys())
@@ -87,16 +107,48 @@ class IngestionManager:
                 results[name] = {"error": str(e)}
 
         # Refresh MVs if any spending source ingestor ran and succeeded.
-        spending_ingestors = {
-            "inside_totals_by_candidate",
-            "schedule_e_totals_by_candidate",
-        }
-        ran = spending_ingestors & set(targets)
+        ran = set(SPENDING_INGESTOR_NAMES) & set(targets)
         any_succeeded = any(
-            results.get(name) and "error" not in results.get(name, {})
-            for name in ran
+            results.get(name) and "error" not in results.get(name, {}) for name in ran
         )
-        if any_succeeded:
+        if any_succeeded and not skip_mv_refresh:
+            await self.refresh_spending_stats()
+
+        return results
+
+    async def run_nightly(self) -> Dict[str, Any]:
+        """Run the full nightly ingestion routine.
+
+        Date-windowed entities (committees, candidates) run once, resuming
+        from their watermark. The two spending-totals ingestors run once per
+        active cycle (2024 onward), since they're cycle-scoped snapshots
+        rather than date-windowed. Guards against overlapping runs: a recent
+        in-progress run blocks this one; a stale one self-heals first.
+        """
+        async with AsyncSessionLocal() as session:
+            guard = IngestionRunService(session)
+            if await guard.has_active_run(OVERLAP_TIMEOUT_MINUTES):
+                logger.warning("Overlap guard: a run is already in progress, skipping.")
+                return {"skipped": "overlap_guard"}
+            await guard.reset_stale_runs(OVERLAP_TIMEOUT_MINUTES)
+
+        results: Dict[str, Any] = {}
+        results.update(await self.ingest_batch(DATE_WINDOWED_ENTITIES))
+
+        any_spending_succeeded = False
+        for cycle in active_cycles():
+            cycle_results = await self.ingest_batch(
+                SPENDING_ENTITIES, cycle=cycle, skip_mv_refresh=True
+            )
+            results.update({f"{name}:{cycle}": r for name, r in cycle_results.items()})
+            any_spending_succeeded = any_spending_succeeded or any(
+                r and "error" not in r for r in cycle_results.values()
+            )
+
+        # One refresh for the whole run, not once per active cycle — the MVs
+        # span every cycle, so refreshing after each is redundant work that
+        # grows every time another cycle becomes active.
+        if any_spending_succeeded:
             await self.refresh_spending_stats()
 
         return results
@@ -125,5 +177,7 @@ class IngestionManager:
                 await session.commit()
                 logger.info("✅ Materialized views refreshed.")
             except Exception as e:
-                logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to refresh materialized views: {e}", exc_info=True
+                )
                 await session.rollback()

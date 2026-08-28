@@ -6,5 +6,9 @@ export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
     environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    env: {
+      NEXT_PUBLIC_API_URL: 'http://localhost:3000/mock-api',
+    },
   },
 })
