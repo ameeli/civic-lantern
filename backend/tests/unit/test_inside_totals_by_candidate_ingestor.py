@@ -38,21 +38,6 @@ class TestInsideTotalsByCandidateIngestor:
         with pytest.raises(TypeError):
             await ingestor.fetch()
 
-    async def test_fetch_strips_date_kwargs(self, mock_client, mock_session):
-        """fetch() removes start_date/end_date before passing kwargs to client.
-
-        These arrive because run_nightly() invokes both spending ingestors
-        via the same ingest_batch() path used by date-windowed ingestors.
-        """
-        mock_client.get_candidate_totals.return_value = []
-
-        ingestor = InsideTotalsByCandidateIngestor(
-            client=mock_client, session=mock_session
-        )
-        await ingestor.fetch(cycle=2024, start_date="2024-01-01", end_date="2024-12-31")
-
-        mock_client.get_candidate_totals.assert_awaited_once_with(cycle=2024)
-
     async def test_fetch_passes_explicit_cycle(self, mock_client, mock_session):
         """fetch() passes the provided cycle through to the client."""
         mock_client.get_candidate_totals.return_value = []

@@ -243,3 +243,48 @@ class TestRunNightly:
         assert "committees" in result
         assert "inside_totals_by_candidate:2024" in result
         assert "schedule_e_totals_by_candidate:2026" in result
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_refreshes_mv_once_total_not_once_per_cycle(
+        self, MockRunService, MockSession, manager
+    ):
+        """The MVs span every cycle — refresh once per run, not per cycle."""
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=False)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        async def fake_ingest_batch(entities, *args, **kwargs):
+            return {name: {"inserted": 1} for name in entities}
+
+        with patch.object(manager, "ingest_batch", side_effect=fake_ingest_batch):
+            with patch(
+                "civic_lantern.jobs.manager.active_cycles", return_value=[2024, 2026]
+            ):
+                with patch.object(
+                    manager, "refresh_spending_stats", new_callable=AsyncMock
+                ) as mock_refresh:
+                    await manager.run_nightly()
+
+        mock_refresh.assert_awaited_once()
+
+    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_skips_mv_refresh_when_no_active_cycles_succeed(
+        self, MockRunService, MockSession, manager
+    ):
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=False)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        async def fake_ingest_batch(entities, *args, **kwargs):
+            return {name: {"error": "boom"} for name in entities}
+
+        with patch.object(manager, "ingest_batch", side_effect=fake_ingest_batch):
+            with patch("civic_lantern.jobs.manager.active_cycles", return_value=[2024]):
+                with patch.object(
+                    manager, "refresh_spending_stats", new_callable=AsyncMock
+                ) as mock_refresh:
+                    await manager.run_nightly()
+
+        mock_refresh.assert_not_awaited()

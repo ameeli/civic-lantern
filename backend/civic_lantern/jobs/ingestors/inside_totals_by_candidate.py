@@ -14,8 +14,6 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
 
     async def fetch(self, cycle: int, **kwargs: Any) -> List[Dict[str, Any]]:
         """Fetch inside spending totals for all candidates in the given cycle."""
-        kwargs.pop("start_date", None)
-        kwargs.pop("end_date", None)
         return await self.client.get_candidate_totals(cycle=cycle, **kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:

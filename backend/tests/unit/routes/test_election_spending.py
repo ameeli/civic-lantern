@@ -1,6 +1,6 @@
 import pytest
 
-from civic_lantern.api.routers.election_spending import _MAX_CYCLE
+from civic_lantern.core.cycles import current_cycle_ceiling
 from civic_lantern.db.models.mv_election_spending_summary import (
     MvElectionSpendingSummary,
 )
@@ -99,5 +99,21 @@ class TestGetElectionSpendingByCycle:
         assert response.status_code == 422
 
     async def test_cycle_above_max_returns_422(self, api_client, mock_session):
-        response = await api_client.get(election_spending_by_cycle_url(_MAX_CYCLE + 2))
+        url = election_spending_by_cycle_url(current_cycle_ceiling() + 2)
+        response = await api_client.get(url)
         assert response.status_code == 422
+
+    async def test_max_cycle_is_recomputed_per_request_not_frozen_at_import(
+        self, api_client, mock_session, mocker, spending_obj
+    ):
+        """A newly-active cycle isn't permanently rejected by a long-running
+        process that started in an earlier year."""
+        mocker.patch(
+            "civic_lantern.api.routers.election_spending.current_cycle_ceiling",
+            return_value=2028,
+        )
+        mock_session.execute.return_value = scalars_first_result(spending_obj)
+
+        response = await api_client.get(election_spending_by_cycle_url(2028))
+
+        assert response.status_code == 200

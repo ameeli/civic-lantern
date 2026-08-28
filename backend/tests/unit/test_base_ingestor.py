@@ -35,6 +35,26 @@ class FakeIngestor(BaseIngestor):
         return service
 
 
+class CycleScopedFakeIngestor(BaseIngestor):
+    """Mirrors the real cycle-scoped ingestors: fetch() takes cycle, not dates."""
+
+    entity_name = "fake_cycle_scoped"
+
+    def __init__(self, client, session):
+        super().__init__(client, session)
+        self.captured_kwargs: Dict[str, Any] = {}
+
+    async def fetch(self, cycle: int, **kwargs: Any) -> list:
+        self.captured_kwargs = kwargs
+        return []
+
+    def transform(self, raw_data: List[Dict[str, Any]]) -> list:
+        return []
+
+    def create_service(self) -> AsyncMock:
+        return AsyncMock()
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestBaseIngestorWorkflow:
@@ -163,6 +183,36 @@ class TestBaseIngestorWorkflow:
             await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_failure_rolls_back_before_recording(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """Session is rolled back before complete_run(success=False).
+
+        Otherwise, if the failing exception left the session's transaction
+        aborted, complete_run's own commit() would raise too — masking the
+        original error and leaving the row stuck IN_PROGRESS.
+        """
+        MockRunService.return_value.start_run = AsyncMock(return_value=object())
+        MockRunService.return_value.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=["validated_obj"],
+        )
+        failing_service = AsyncMock()
+        failing_service.upsert_batch.side_effect = Exception("DB gone")
+        ingestor.create_service = lambda: failing_service
+
+        with pytest.raises(Exception, match="DB gone"):
+            await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        mock_session.rollback.assert_awaited_once()
+        # rollback must happen before complete_run is called, not after
+        assert mock_session.rollback.call_args is not None
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_run_records_start_and_success(
         self, MockRunService, mock_client, mock_session
     ):
@@ -172,16 +222,11 @@ class TestBaseIngestorWorkflow:
         mock_tracker.start_run = AsyncMock(return_value=run_row)
         mock_tracker.complete_run = AsyncMock()
 
-        ingestor = FakeIngestor(
-            client=mock_client,
-            session=mock_session,
-            fetch_return=[{"id": "1"}],
-            transform_return=["validated_obj"],
-        )
+        ingestor = CycleScopedFakeIngestor(client=mock_client, session=mock_session)
 
-        await ingestor.run(start_date="2024-01-01", end_date="2024-06-01", cycle=2024)
+        await ingestor.run(cycle=2024)
 
-        mock_tracker.start_run.assert_awaited_once_with("fake", 2024)
+        mock_tracker.start_run.assert_awaited_once_with("fake_cycle_scoped", 2024)
         mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
@@ -232,3 +277,24 @@ class TestBaseIngestorWorkflow:
 
         assert result is None
         mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_run_strips_date_kwargs_for_cycle_scoped_ingestors(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """run() strips start_date/end_date before calling fetch() when a
+        cycle is present — cycle-scoped ingestors take no date window, but
+        run_nightly() invokes them through the same ingest_batch() path used
+        by date-windowed ingestors, which always forwards those kwargs
+        (usually None). Centralized here so individual cycle-scoped
+        ingestors don't each need to repeat the stripping.
+        """
+        MockRunService.return_value.start_run = AsyncMock(return_value=object())
+        MockRunService.return_value.complete_run = AsyncMock()
+
+        ingestor = CycleScopedFakeIngestor(client=mock_client, session=mock_session)
+
+        await ingestor.run(cycle=2024, start_date=None, end_date="2026-01-01")
+
+        assert "start_date" not in ingestor.captured_kwargs
+        assert "end_date" not in ingestor.captured_kwargs

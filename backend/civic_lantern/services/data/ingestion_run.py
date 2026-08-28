@@ -6,6 +6,10 @@ from sqlalchemy import distinct, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.ingestion_run import IngestionRun, IngestionRunStatus
+from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
+from civic_lantern.db.models.schedule_e_totals_by_candidate import (
+    ScheduleETotalsByCandidate,
+)
 from civic_lantern.services.data.base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -109,15 +113,30 @@ class IngestionRunService(BaseService[IngestionRun]):
             )
 
     async def get_ready_cycles(self, required_ingestors: list[str]) -> list[int]:
-        """Cycles where every ingestor in `required_ingestors` has succeeded.
+        """Cycles where every ingestor in `required_ingestors` has EVER
+        succeeded, and both spending tables actually have rows for it.
+
+        Deliberately built on `last_run_completed_at` (preserved across a
+        later failure) rather than the latest run's `status` — a transient
+        error re-ingesting an already-ready cycle (run_nightly re-runs every
+        active cycle nightly, not just new ones) would otherwise flip that
+        cycle back to not-ready even though its previously-ingested data is
+        untouched. The data-existence check separately guards the opposite
+        case: a brand-new cycle whose first run "succeeds" with zero records
+        (no FEC data yet) must not be reported as ready.
+
+        Hardcodes the two spending tables rather than taking a generic
+        ingestor->table mapping — there are only ever these two spending
+        ingestors (see SPENDING_INGESTOR_NAMES), so a generic mapping would
+        be pure indirection.
 
         Newest first.
         """
-        stmt = (
+        succeeded_stmt = (
             select(IngestionRun.cycle)
             .where(
                 IngestionRun.ingestor_name.in_(required_ingestors),
-                IngestionRun.status == IngestionRunStatus.SUCCESS,
+                IngestionRun.last_run_completed_at.isnot(None),
                 IngestionRun.cycle.isnot(None),
             )
             .group_by(IngestionRun.cycle)
@@ -125,7 +144,21 @@ class IngestionRunService(BaseService[IngestionRun]):
                 func.count(distinct(IngestionRun.ingestor_name))
                 == len(required_ingestors)
             )
-            .order_by(IngestionRun.cycle.desc())
         )
-        result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        result = await self.db.execute(succeeded_stmt)
+        candidate_cycles = list(result.scalars().all())
+        if not candidate_cycles:
+            return []
+
+        inside_stmt = select(InsideTotalsByCandidate.cycle.distinct()).where(
+            InsideTotalsByCandidate.cycle.in_(candidate_cycles)
+        )
+        inside_cycles = set((await self.db.execute(inside_stmt)).scalars().all())
+
+        outside_stmt = select(ScheduleETotalsByCandidate.cycle.distinct()).where(
+            ScheduleETotalsByCandidate.cycle.in_(candidate_cycles)
+        )
+        outside_cycles = set((await self.db.execute(outside_stmt)).scalars().all())
+
+        ready = set(candidate_cycles) & inside_cycles & outside_cycles
+        return sorted(ready, reverse=True)

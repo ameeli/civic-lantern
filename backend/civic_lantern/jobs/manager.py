@@ -15,9 +15,12 @@ logger = logging.getLogger(__name__)
 DATE_WINDOWED_ENTITIES = ["committees", "candidates"]
 # Looped once per active cycle — cycle-scoped snapshot ingestors.
 SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
-# Comfortably above worst-case run time given the FEC 900/hr rate limit and
-# current dataset size; generous enough not to false-positive on a slow FEC day.
-OVERLAP_TIMEOUT_MINUTES = 180
+# Generous enough to never false-positive on a legitimately slow run — in
+# particular, an ingestor's very first-ever invocation does a full,
+# unfiltered historical pull (see BaseIngestor._resolve_dates) that can take
+# several hours under the FEC 900/hr rate limit. Still self-heals well
+# before the next night's scheduled trigger.
+OVERLAP_TIMEOUT_MINUTES = 720
 
 
 class IngestionManager:
@@ -74,12 +77,19 @@ class IngestionManager:
         entities: Optional[List[str]] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        *,
+        skip_mv_refresh: bool = False,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Run ingestors for the given entities, or all if not specified.
 
         Executes in dependency order. Continues on failure — a failed
         entity is logged and recorded but does not block subsequent ones.
+
+        `skip_mv_refresh` lets a caller defer the MV refresh across several
+        calls (e.g. run_nightly()'s per-cycle loop) so it happens once
+        overall rather than once per call — the MVs span every cycle, so
+        refreshing after each individual cycle is redundant work.
         """
         if entities:
             registry_keys = list(INGESTOR_REGISTRY.keys())
@@ -101,7 +111,7 @@ class IngestionManager:
         any_succeeded = any(
             results.get(name) and "error" not in results.get(name, {}) for name in ran
         )
-        if any_succeeded:
+        if any_succeeded and not skip_mv_refresh:
             await self.refresh_spending_stats()
 
         return results
@@ -125,9 +135,21 @@ class IngestionManager:
         results: Dict[str, Any] = {}
         results.update(await self.ingest_batch(DATE_WINDOWED_ENTITIES))
 
+        any_spending_succeeded = False
         for cycle in active_cycles():
-            cycle_results = await self.ingest_batch(SPENDING_ENTITIES, cycle=cycle)
+            cycle_results = await self.ingest_batch(
+                SPENDING_ENTITIES, cycle=cycle, skip_mv_refresh=True
+            )
             results.update({f"{name}:{cycle}": r for name, r in cycle_results.items()})
+            any_spending_succeeded = any_spending_succeeded or any(
+                r and "error" not in r for r in cycle_results.values()
+            )
+
+        # One refresh for the whole run, not once per active cycle — the MVs
+        # span every cycle, so refreshing after each is redundant work that
+        # grows every time another cycle becomes active.
+        if any_spending_succeeded:
+            await self.refresh_spending_stats()
 
         return results
 

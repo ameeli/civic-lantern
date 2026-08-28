@@ -40,6 +40,15 @@ class BaseIngestor(ABC):
         self.logger.info(f"Syncing {self.entity_name}")
 
         cycle = kwargs.get("cycle")
+        if cycle is not None:
+            # Cycle-scoped ingestors take no date window — run_nightly()
+            # invokes them through the same ingest_batch() path used by
+            # date-windowed ingestors, which always forwards start_date/
+            # end_date (usually None). Stripping here once means individual
+            # cycle-scoped ingestors don't each need to repeat this.
+            kwargs.pop("start_date", None)
+            kwargs.pop("end_date", None)
+
         run_tracker = IngestionRunService(self.session)
         run_row = await run_tracker.start_run(self.entity_name, cycle)
 
@@ -66,6 +75,11 @@ class BaseIngestor(ABC):
             self.logger.error(
                 f"{self.entity_name} ingestion failed: {e}", exc_info=True
             )
+            # The exception may have left the session's transaction aborted
+            # (e.g. a bare commit() failing inside upsert_batch) — roll back
+            # first, or complete_run's own commit() would raise too, masking
+            # this error and leaving the row stuck IN_PROGRESS.
+            await self.session.rollback()
             await run_tracker.complete_run(run_row, success=False, error_message=str(e))
             raise
 
