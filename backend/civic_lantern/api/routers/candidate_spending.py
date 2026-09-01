@@ -16,7 +16,7 @@ router = APIRouter(prefix="/candidate-spending", tags=["candidate_spending"])
 @router.get("", response_model=CandidateSpendingList)
 async def list_candidate_spending(
     pagination: PaginationParams = Depends(),
-    sort_by: SpendingSortBy = Query("outside_total", description="Field to sort by"),
+    sort_by: SpendingSortBy = Query("total_spending", description="Field to sort by"),
     order: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
     cycle: Optional[int] = Query(None, description="Filter by election cycle"),
     db: AsyncSession = Depends(get_db),

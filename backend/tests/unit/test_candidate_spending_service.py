@@ -3,7 +3,7 @@ import operator
 import pytest
 from sqlalchemy import select
 from sqlalchemy.sql import operators
-from sqlalchemy.sql.expression import BinaryExpression
+from sqlalchemy.sql.elements import ExpressionClauseList
 
 from civic_lantern.db.models.mv_candidate_spending_summary import (
     MvCandidateSpendingSummary,
@@ -24,14 +24,17 @@ def base_stmt():
 
 @pytest.mark.unit
 class TestApplySorting:
-    def test_outside_total_sorts_by_sum_expression(self, service, base_stmt):
-        """outside_total must ORDER BY support+oppose, not either column alone."""
-        sorted_stmt = service._apply_sorting(base_stmt, "outside_total", "desc")
+    def test_total_spending_sorts_by_sum_expression(self, service, base_stmt):
+        """total_spending must ORDER BY disbursements+support+oppose, not any column alone."""
+        sorted_stmt = service._apply_sorting(base_stmt, "total_spending", "desc")
 
         primary_sort = sorted_stmt._order_by_clauses[0]
 
-        assert isinstance(primary_sort.element, BinaryExpression)
+        # SQLAlchemy flattens a 3-term `+` chain into a single ExpressionClauseList
+        # rather than nested BinaryExpressions.
+        assert isinstance(primary_sort.element, ExpressionClauseList)
         assert primary_sort.element.operator is operator.add
+        assert len(primary_sort.element.clauses) == 3
 
     def test_non_virtual_sort_has_no_expression(self, service, base_stmt):
         """A plain column sort should not produce a + expression in ORDER BY."""
@@ -47,7 +50,7 @@ class TestApplySorting:
             "inside_disbursements",
             "outside_support",
             "outside_oppose",
-            "outside_total",
+            "total_spending",
             "influence_ratio",
             "vulnerability_factor",
         ],

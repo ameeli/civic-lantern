@@ -25,6 +25,7 @@ export interface CandidateSpending {
   inside_disbursements: number | null;
   outside_support: number | null;
   outside_oppose: number | null;
+  total_spending: number | null;
   influence_ratio: number | null;
   vulnerability_factor: number | null;
   candidate: CandidateInfo | null;
@@ -43,7 +44,7 @@ export type SpendingSortBy =
   | "inside_disbursements"
   | "outside_support"
   | "outside_oppose"
-  | "outside_total"
+  | "total_spending"
   | "influence_ratio"
   | "vulnerability_factor";
 

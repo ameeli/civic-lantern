@@ -8,7 +8,7 @@ export default async function SpendingPackChartSection({
 }) {
   const { items } = await listCandidatesSpending({
     cycle,
-    sort_by: "outside_total",
+    sort_by: "total_spending",
     order: "desc",
     limit: 500,
   });

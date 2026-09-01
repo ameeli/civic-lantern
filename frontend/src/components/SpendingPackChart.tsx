@@ -13,7 +13,7 @@ import {
 import ChartBreadcrumb from "./ChartBreadcrumb";
 import type { CandidateSpending } from "@/types/spending";
 
-const THRESHOLD = 1_000_000;
+const THRESHOLD = 6_000_000;
 
 function formatDollars(v: number): string {
   if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;

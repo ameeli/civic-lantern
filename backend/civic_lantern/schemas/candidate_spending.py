@@ -8,7 +8,7 @@ SpendingSortBy = Literal[
     "inside_disbursements",
     "outside_support",
     "outside_oppose",
-    "outside_total",
+    "total_spending",
     "influence_ratio",
     "vulnerability_factor",
 ]
@@ -33,6 +33,7 @@ class CandidateSpendingSchema(BaseModel):
     inside_disbursements: Optional[float] = None
     outside_support: Optional[float] = None
     outside_oppose: Optional[float] = None
+    total_spending: Optional[float] = None
     influence_ratio: Optional[float] = None
     vulnerability_factor: Optional[float] = None
     candidate: Optional[CandidateInfo] = None
@@ -40,15 +41,18 @@ class CandidateSpendingSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
-    def _compute_ratios(self) -> "CandidateSpendingSchema":
-        """Compute influence_ratio and vulnerability_factor from spending data."""
+    def _compute_derived_fields(self) -> "CandidateSpendingSchema":
+        """Compute total_spending, influence_ratio, and vulnerability_factor."""
+        disbursements = self.inside_disbursements or 0.0
+        support = self.outside_support or 0.0
+        oppose = self.outside_oppose or 0.0
+        self.total_spending = disbursements + support + oppose
+
         denom = self.inside_disbursements
         if not denom:
             self.influence_ratio = None
             self.vulnerability_factor = None
             return self
-        support = self.outside_support or 0.0
-        oppose = self.outside_oppose or 0.0
         self.influence_ratio = round((support + oppose) / denom, 2)
         self.vulnerability_factor = round(oppose / denom, 2)
         return self

@@ -18,6 +18,7 @@ function makeCandidate(
     inside_disbursements: inside,
     outside_support: outsideSupport,
     outside_oppose: outsideOppose,
+    total_spending: inside + outsideSupport + outsideOppose,
     influence_ratio: null,
     vulnerability_factor: null,
     candidate: office

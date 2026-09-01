@@ -42,11 +42,11 @@ export function transformToHierarchy(
     const office = c.candidate?.office;
     if (!office || !(office in aboveThreshold)) continue;
 
-    const outsideTotal = (c.outside_support ?? 0) + (c.outside_oppose ?? 0);
-    if (outsideTotal >= threshold) {
+    const totalSpending = c.total_spending ?? 0;
+    if (totalSpending >= threshold) {
       aboveThreshold[office].push(c);
     } else {
-      belowThreshold[office] += (c.inside_disbursements ?? 0) + outsideTotal;
+      belowThreshold[office] += totalSpending;
     }
   }
 

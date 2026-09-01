@@ -258,8 +258,8 @@ class TestGetList:
 
         assert [r.cycle for r in result["items"]] == [2020, 2022, 2024]
 
-    async def test_sort_by_outside_total_desc(self, db_with_mv):
-        """outside_total is a computed sort column (support + oppose)."""
+    async def test_sort_by_total_spending_desc(self, db_with_mv):
+        """total_spending is a computed sort column (disbursements + support + oppose)."""
         await _seed_and_refresh(
             db_with_mv,
             candidates=[
@@ -322,14 +322,14 @@ class TestGetList:
         )
 
         service = CandidateSpendingService(db=db_with_mv)
-        result = await service.get_list(sort_by="outside_total", order="desc")
+        result = await service.get_list(sort_by="total_spending", order="desc")
 
         assert [r.candidate_id for r in result["items"]] == ["C003", "C001", "C002"]
 
     async def test_includes_candidate_info(self, db_with_mv, standard_seed_data):
         """_attach_candidates populates the .candidate attribute."""
         service = CandidateSpendingService(db=db_with_mv)
-        result = await service.get_list(sort_by="outside_total", order="desc")
+        result = await service.get_list(sort_by="total_spending", order="desc")
 
         c001 = next(r for r in result["items"] if r.candidate_id == "C001")
         assert c001.candidate is not None
@@ -344,7 +344,7 @@ class TestGetList:
             "inside_disbursements",
             "outside_support",
             "outside_oppose",
-            "outside_total",
+            "total_spending",
             "influence_ratio",
             "vulnerability_factor",
         ],

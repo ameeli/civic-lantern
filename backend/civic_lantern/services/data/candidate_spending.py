@@ -31,7 +31,8 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
             "inside_disbursements": MvCandidateSpendingSummary.inside_disbursements,
             "outside_support": MvCandidateSpendingSummary.outside_support,
             "outside_oppose": MvCandidateSpendingSummary.outside_oppose,
-            "outside_total": MvCandidateSpendingSummary.outside_support
+            "total_spending": MvCandidateSpendingSummary.inside_disbursements
+            + MvCandidateSpendingSummary.outside_support
             + MvCandidateSpendingSummary.outside_oppose,
             "influence_ratio": MvCandidateSpendingSummary.influence_ratio,
             "vulnerability_factor": MvCandidateSpendingSummary.vulnerability_factor,
@@ -65,7 +66,7 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
         self,
         limit: int = 100,
         offset: int = 0,
-        sort_by: SpendingSortBy = "outside_total",
+        sort_by: SpendingSortBy = "total_spending",
         order: Literal["asc", "desc"] = "desc",
         cycle: Optional[int] = None,
     ) -> dict[str, Any]:

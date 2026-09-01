@@ -162,7 +162,7 @@ All endpoints are read-only (`GET`) and mounted under `/api/v1`.
 
 | Method | Path | Query params | Returns |
 |---|---|---|---|
-| GET | `/` | `cycle`, `limit`/`offset`, `sort_by` (e.g. `outside_total`, `influence_ratio`), `order` | Paginated candidate spending summaries, joined with candidate info |
+| GET | `/` | `cycle`, `limit`/`offset`, `sort_by` (e.g. `total_spending`, `influence_ratio`), `order` | Paginated candidate spending summaries, joined with candidate info |
 
 **`/api/v1/election-spending`** (`api/routers/election_spending.py`)
 

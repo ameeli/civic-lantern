@@ -92,7 +92,7 @@ class TestListCandidateSpending:
             "inside_disbursements",
             "outside_support",
             "outside_oppose",
-            "outside_total",
+            "total_spending",
             "influence_ratio",
             "vulnerability_factor",
         ],
