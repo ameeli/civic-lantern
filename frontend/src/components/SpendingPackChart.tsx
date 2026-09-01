@@ -13,7 +13,7 @@ import {
 import ChartBreadcrumb from "./ChartBreadcrumb";
 import type { CandidateSpending } from "@/types/spending";
 
-const THRESHOLD = 6_000_000;
+const MAX_NAMED_CANDIDATES_PER_OFFICE = 20;
 
 function formatDollars(v: number): string {
   if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
@@ -146,7 +146,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   const { width, height } = useChartDimensions(containerRef);
 
   const hierarchy = useMemo(
-    () => transformToHierarchy(data, THRESHOLD),
+    () => transformToHierarchy(data, MAX_NAMED_CANDIDATES_PER_OFFICE),
     [data],
   );
 

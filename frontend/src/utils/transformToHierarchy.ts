@@ -27,27 +27,22 @@ const OFFICE_LABELS: Record<string, string> = {
   H: "House",
 };
 
+const DEFAULT_MAX_NAMED_PER_OFFICE = 20;
+
 export function transformToHierarchy(
   candidates: CandidateSpending[],
-  threshold: number,
+  maxNamedPerOffice: number = DEFAULT_MAX_NAMED_PER_OFFICE,
 ): HierarchyRoot {
-  const aboveThreshold: Record<string, CandidateSpending[]> = {
+  const byOffice: Record<string, CandidateSpending[]> = {
     P: [],
     S: [],
     H: [],
   };
-  const belowThreshold: Record<string, number> = { P: 0, S: 0, H: 0 };
 
   for (const c of candidates) {
     const office = c.candidate?.office;
-    if (!office || !(office in aboveThreshold)) continue;
-
-    const totalSpending = c.total_spending ?? 0;
-    if (totalSpending >= threshold) {
-      aboveThreshold[office].push(c);
-    } else {
-      belowThreshold[office] += totalSpending;
-    }
+    if (!office || !(office in byOffice)) continue;
+    byOffice[office].push(c);
   }
 
   const toCandidateNode = (c: CandidateSpending): CandidateNode => ({
@@ -60,13 +55,32 @@ export function transformToHierarchy(
     ],
   });
 
-  const toRaceNode = (office: string): RaceNode => ({
-    name: OFFICE_LABELS[office],
-    children: [
-      ...aboveThreshold[office].map(toCandidateNode),
-      { name: "Others", value: belowThreshold[office] },
-    ],
-  });
+  const toRaceNode = (office: string): RaceNode => {
+    // Sort explicitly here rather than relying on the caller's incoming
+    // sort order, so this function is correct and testable in isolation.
+    const spenders = byOffice[office]
+      .filter((c) => (c.total_spending ?? 0) > 0)
+      .sort((a, b) => (b.total_spending ?? 0) - (a.total_spending ?? 0));
+
+    const named = spenders.slice(0, maxNamedPerOffice);
+    const beyondTopN = spenders.slice(maxNamedPerOffice);
+    const nonPositive = byOffice[office].filter(
+      (c) => (c.total_spending ?? 0) <= 0,
+    );
+
+    const othersTotal = [...beyondTopN, ...nonPositive].reduce(
+      (sum, c) => sum + (c.total_spending ?? 0),
+      0,
+    );
+
+    return {
+      name: OFFICE_LABELS[office],
+      children: [
+        ...named.map(toCandidateNode),
+        { name: "Others", value: othersTotal },
+      ],
+    };
+  };
 
   return {
     name: "root",
