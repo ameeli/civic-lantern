@@ -3,6 +3,8 @@ import type { CandidateSpending } from "@/types/spending";
 export interface SpendingLeaf {
   name: string;
   value: number;
+  /** For the "Others" leaf: total_spending of the last named candidate, i.e. everything rolled up here is below this amount. */
+  cutoff?: number;
 }
 
 export interface CandidateNode {
@@ -72,13 +74,16 @@ export function transformToHierarchy(
       (sum, c) => sum + (c.total_spending ?? 0),
       0,
     );
+    const lastNamed = named[named.length - 1];
+    const othersLeaf: SpendingLeaf = {
+      name: "Others",
+      value: othersTotal,
+      ...(lastNamed ? { cutoff: lastNamed.total_spending ?? 0 } : {}),
+    };
 
     return {
       name: OFFICE_LABELS[office],
-      children: [
-        ...named.map(toCandidateNode),
-        { name: "Others", value: othersTotal },
-      ],
+      children: [...named.map(toCandidateNode), othersLeaf],
     };
   };
 

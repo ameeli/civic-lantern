@@ -90,6 +90,8 @@ describe("transformToHierarchy", () => {
     const others = house.children.find((c) => c.name === "Others");
     expect(others).toBeDefined();
     expect((others as { value: number }).value).toBe(200 + 100);
+    // cutoff is the total_spending of the last named candidate (H2 = 300)
+    expect((others as { cutoff?: number }).cutoff).toBe(300);
   });
 
   it("bounds named circles to N regardless of how many total candidates an office has", () => {
@@ -115,6 +117,20 @@ describe("transformToHierarchy", () => {
 
     const others = presidential.children.find((c) => c.name === "Others");
     expect((others as { value: number }).value).toBe(0 + -100);
+    expect((others as { cutoff?: number }).cutoff).toBe(500_000);
+  });
+
+  it("Others has no cutoff when an office has no named candidates", () => {
+    const candidates = [
+      makeCandidate("P1", "P", { totalSpending: 0 }),
+      makeCandidate("P2", "P", { totalSpending: -50 }),
+    ];
+    const result = transformToHierarchy(candidates, MAX_NAMED);
+    const presidential = result.children[0];
+
+    const others = presidential.children.find((c) => c.name === "Others");
+    expect(others).toBeDefined();
+    expect((others as { cutoff?: number }).cutoff).toBeUndefined();
   });
 
   it("rolls below-threshold and zero/negative spending into Others value", () => {
@@ -144,6 +160,8 @@ describe("transformToHierarchy", () => {
 
     const others = house.children.find((c) => c.name === "Others");
     expect((others as { value: number }).value).toBe(500);
+    // cutoff comes from the last named candidate (H1), even under a tie
+    expect((others as { cutoff?: number }).cutoff).toBe(500);
   });
 
   it("named candidate node has exactly three leaves: Inside, Outside Support, Outside Oppose", () => {

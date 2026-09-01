@@ -88,7 +88,11 @@ function wrapLabel(
     const maxWidth = d.r * 1.6;
 
     const displayName =
-      d.depth === 3 ? spendingLabel(d.data.name) : d.data.name;
+      d.depth === 3
+        ? spendingLabel(d.data.name)
+        : "cutoff" in d.data && d.data.cutoff !== undefined
+          ? `Less than ${formatDollars(d.data.cutoff)}`
+          : d.data.name;
     const nameLines = wrapWords(
       el,
       displayName.split(/\s+/).filter(Boolean),
