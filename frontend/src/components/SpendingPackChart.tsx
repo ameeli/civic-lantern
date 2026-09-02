@@ -52,6 +52,18 @@ function spendingLabel(name: string): string {
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
+function isOthersNode(d: { data: SpendingNode }): boolean {
+  return "cutoff" in d.data && d.data.cutoff !== undefined;
+}
+
+// Bypasse d3's HierarchyNode.value read only restriction for value-damping mutation.
+function setNodeValue(
+  node: d3.HierarchyNode<SpendingNode>,
+  value: number | undefined,
+): void {
+  (node as { value?: number }).value = value;
+}
+
 function wrapWords(
   el: d3.Selection<SVGTextElement, unknown, null, undefined>,
   words: string[],
@@ -167,10 +179,39 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .sum((d) => ("value" in d ? d.value : 0))
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
+    // Cap "Less than" node's contribution to the pack's SIZING calculation at the
+    // combined value of its office's named candidates, so it never claims more than
+    // roughly half of the total area.
+    const trueValues = new Map<d3.HierarchyNode<SpendingNode>, number>();
+    root.each((d) => trueValues.set(d, d.value ?? 0));
+
+    root.each((d) => {
+      if (!isOthersNode(d)) return;
+      const siblings = d.parent?.children ?? [];
+      const candidatesSum = siblings
+        .filter((s) => s !== d)
+        .reduce((sum, s) => sum + (trueValues.get(s) ?? 0), 0);
+      const trueValue = trueValues.get(d) ?? 0;
+      const cappedValue = Math.min(trueValue, candidatesSum);
+      const delta = trueValue - cappedValue;
+      if (delta <= 0) return;
+      let cur: d3.HierarchyNode<SpendingNode> | null = d;
+      while (cur) {
+        setNodeValue(cur, (cur.value ?? 0) - delta);
+        cur = cur.parent;
+      }
+    });
+
     d3
       .pack<SpendingNode>()
       .size([width, height] as [number, number])
       .padding(3)(root);
+
+    // Restore true values for accurate display text — radii/positions are
+    // already computed and unaffected by this.
+    root.each((d) => {
+      setNodeValue(d, trueValues.get(d));
+    });
 
     const packRoot = root as PackNode;
     packRootRef.current = packRoot;
