@@ -13,7 +13,7 @@ import {
 import ChartBreadcrumb from "./ChartBreadcrumb";
 import type { CandidateSpending } from "@/types/spending";
 
-const MAX_NAMED_CANDIDATES_PER_OFFICE = 20;
+const MAX_NAMED_CANDIDATES_PER_OFFICE = 30;
 
 function formatDollars(v: number): string {
   if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
