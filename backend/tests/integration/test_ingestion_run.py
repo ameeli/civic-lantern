@@ -100,7 +100,7 @@ class TestIngestionRunServiceWatermark:
     async def test_start_run_reuses_existing_row(self, async_db: AsyncSession):
         service = IngestionRunService(async_db)
         first = await service.start_run("candidates")
-        await service.complete_run(first, success=True)
+        await service.complete_run(first, status=IngestionRunStatus.SUCCESS)
 
         second = await service.start_run("candidates")
 
@@ -116,7 +116,7 @@ class TestIngestionRunServiceWatermark:
     async def test_get_watermark_after_success(self, async_db: AsyncSession):
         service = IngestionRunService(async_db)
         run = await service.start_run("candidates")
-        await service.complete_run(run, success=True)
+        await service.complete_run(run, status=IngestionRunStatus.SUCCESS)
 
         watermark = await service.get_watermark("candidates")
 
@@ -125,7 +125,9 @@ class TestIngestionRunServiceWatermark:
     async def test_failed_run_does_not_set_watermark(self, async_db: AsyncSession):
         service = IngestionRunService(async_db)
         run = await service.start_run("candidates")
-        await service.complete_run(run, success=False, error_message="boom")
+        await service.complete_run(
+            run, status=IngestionRunStatus.FAILED, error_message="boom"
+        )
 
         assert await service.get_watermark("candidates") is None
         assert run.status == IngestionRunStatus.FAILED
@@ -134,11 +136,13 @@ class TestIngestionRunServiceWatermark:
     async def test_failed_run_preserves_prior_watermark(self, async_db: AsyncSession):
         service = IngestionRunService(async_db)
         run = await service.start_run("candidates")
-        await service.complete_run(run, success=True)
+        await service.complete_run(run, status=IngestionRunStatus.SUCCESS)
         first_watermark = await service.get_watermark("candidates")
 
         run = await service.start_run("candidates")
-        await service.complete_run(run, success=False, error_message="boom again")
+        await service.complete_run(
+            run, status=IngestionRunStatus.FAILED, error_message="boom again"
+        )
 
         assert await service.get_watermark("candidates") == first_watermark
 
@@ -213,7 +217,7 @@ class TestIngestionRunServiceReadyCycles:
 
     async def _succeed(self, service, ingestor_name, cycle):
         run = await service.start_run(ingestor_name, cycle)
-        await service.complete_run(run, success=True)
+        await service.complete_run(run, status=IngestionRunStatus.SUCCESS)
 
     async def _seed_spending_data(self, async_db: AsyncSession, cycle: int) -> None:
         candidate = Candidate(candidate_id=f"C{cycle}", name="Test Candidate")
@@ -279,7 +283,9 @@ class TestIngestionRunServiceReadyCycles:
         assert await service.get_ready_cycles(self.REQUIRED) == [2024]
 
         run = await service.start_run("schedule_e_totals_by_candidate", 2024)
-        await service.complete_run(run, success=False, error_message="transient 5xx")
+        await service.complete_run(
+            run, status=IngestionRunStatus.FAILED, error_message="transient 5xx"
+        )
 
         assert await service.get_ready_cycles(self.REQUIRED) == [2024]
 

@@ -10,12 +10,12 @@ class FECAPIError(Exception):
 class FECRateLimitError(FECAPIError):
     """Raised when FEC API rate limit is exceeded.
 
-    Not retried — the minute_limiter in FECClient should prevent 429s entirely.
-    If one does occur, retrying immediately with a short backoff won't help since
-    the per-minute window hasn't reset.
+    The minute_limiter in FECClient should prevent 429s entirely, but its
+    window is only 1 second wide — if one does occur, fec_retry's backoff
+    (2s minimum) already outlasts that window, so a retry can succeed.
     """
 
-    retryable = False
+    retryable = True
 
 
 class FECNotFoundError(FECAPIError):
@@ -58,3 +58,17 @@ class FECProtocolError(FECAPIError):
     """Raised when protocol/chunking errors occur."""
 
     retryable = True
+
+
+class PartialFetchError(Exception):
+    """Raised when pagination exhausts retries on some pages but not all.
+
+    Carries whatever records were successfully fetched, so a caller can
+    choose to ingest the partial data rather than discarding it outright —
+    while still being able to tell the run wasn't fully clean.
+    """
+
+    def __init__(self, message: str, *, results: list[dict], failed_pages: list[int]):
+        super().__init__(message)
+        self.results = results
+        self.failed_pages = failed_pages

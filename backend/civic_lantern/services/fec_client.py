@@ -18,6 +18,7 @@ from civic_lantern.services.fec_exceptions import (
     FECServerError,
     FECTimeoutError,
     FECValidationError,
+    PartialFetchError,
 )
 from civic_lantern.services.http_utils import fec_retry
 
@@ -129,6 +130,11 @@ class FECClient:
                 f"Partial results for {endpoint_name}: "
                 f"{len(failed_pages)}/{last_page} pages failed "
                 f"(pages {failed_pages}). {len(results)} records returned."
+            )
+            raise PartialFetchError(
+                f"{len(failed_pages)}/{last_page} pages failed for {endpoint_name}",
+                results=results,
+                failed_pages=failed_pages,
             )
 
         return results

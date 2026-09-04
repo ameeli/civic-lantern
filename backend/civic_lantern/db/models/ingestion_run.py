@@ -12,6 +12,7 @@ class IngestionRunStatus(str, Enum):
 
     IN_PROGRESS = "in_progress"
     SUCCESS = "success"
+    PARTIAL_SUCCESS = "partial_success"
     FAILED = "failed"
 
 
@@ -22,6 +23,13 @@ class IngestionRun(Base, TimestampMixin):
     resume from `last_run_completed_at` as a watermark. It is set for the two
     cycle-scoped spending ingestors, where a successful row also marks that
     cycle as "ready" for the frontend.
+
+    PARTIAL_SUCCESS means the ingestor still upserted whatever data it
+    managed to fetch/write cleanly (a few bad pages or rows don't block the
+    rest of a large pull) but `last_run_completed_at` is deliberately left
+    untouched — so a date-windowed ingestor resumes over the same gap next
+    run instead of silently skipping past it, and a cycle-scoped ingestor
+    isn't reported as "ready" on incomplete data.
 
     Rendered as VARCHAR + CHECK (native_enum=False) rather than a native
     Postgres enum: this status is internal bookkeeping expected to grow new
@@ -56,6 +64,7 @@ class IngestionRun(Base, TimestampMixin):
             name="ingestion_run_status_enum",
             values_callable=enum_values_callable,
             native_enum=False,
+            length=32,
         ),
         nullable=False,
     )

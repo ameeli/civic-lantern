@@ -64,15 +64,22 @@ class IngestionRunService(BaseService[IngestionRun]):
         self,
         run: IngestionRun,
         *,
-        success: bool,
+        status: IngestionRunStatus,
         error_message: Optional[str] = None,
     ) -> None:
-        """Mark a run as finished, recording success or failure."""
-        run.status = (
-            IngestionRunStatus.SUCCESS if success else IngestionRunStatus.FAILED
+        """Mark a run as finished, recording its outcome.
+
+        Only a clean SUCCESS advances `last_run_completed_at` — the
+        watermark date-windowed ingestors resume from, and the readiness
+        signal cycle-scoped ingestors publish to the frontend. PARTIAL_SUCCESS
+        deliberately leaves it untouched so the next run re-covers whatever
+        was missed instead of silently skipping past it.
+        """
+        run.status = status
+        run.error_message = (
+            None if status == IngestionRunStatus.SUCCESS else error_message
         )
-        run.error_message = None if success else error_message
-        if success:
+        if status == IngestionRunStatus.SUCCESS:
             run.last_run_completed_at = datetime.now(timezone.utc)
         await self.db.commit()
 

@@ -11,6 +11,7 @@ from civic_lantern.services.fec_exceptions import (
     FECRateLimitError,
     FECServerError,
     FECTimeoutError,
+    PartialFetchError,
 )
 
 
@@ -48,7 +49,10 @@ class TestFECClientErrorHandling:
         assert exc_info.value.retryable is True
 
     async def test_get_candidates_raises_rate_limit_error(self, client, mocker):
-        """429 raises FECRateLimitError immediately — not retried."""
+        """429 is retried — the minute_limiter's window is only 1s wide, so
+        fec_retry's 2s-minimum backoff gives it time to reset — but still
+        raises FECRateLimitError if it never recovers."""
+        mocker.patch("asyncio.sleep")
         mock_response = Mock()
         mock_response.status_code = 429
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
@@ -62,7 +66,7 @@ class TestFECClientErrorHandling:
         with pytest.raises(FECRateLimitError):
             await client.get_candidates(election_year=2024)
 
-        assert mock_get.call_count == 1
+        assert mock_get.call_count == 3
 
     @respx.mock
     async def test_fetch_retries_on_500_error(self, client, mocker):
@@ -147,7 +151,7 @@ class TestFECClientRateLimiting:
 
     @respx.mock
     async def test_both_limiters_acquired_per_request(self, client):
-        """Every _fetch_page call must acquire both the hourly and per-minute limiter."""
+        """Every _fetch_page call must acquire both the hourly and minute limiter."""
         respx.get(url__startswith=client.candidate_url).mock(
             return_value=httpx.Response(
                 200,
@@ -218,8 +222,13 @@ class TestFECClientPagination:
         mock_safe_fetch.assert_any_call(ANY, ANY, 2, ANY)
         mock_safe_fetch.assert_any_call(ANY, ANY, 3, ANY)
 
-    async def test_paginate_aggregates_successful_pages_only(self, client, mocker):
-        """Orchestrator gracefully handles workers that return Exception objects."""
+    async def test_paginate_raises_partial_fetch_error_on_failed_pages(
+        self, client, mocker
+    ):
+        """A worker returning an Exception object doesn't get silently
+        dropped as a clean result — the orchestrator raises PartialFetchError
+        carrying whatever pages did succeed, so callers can't mistake this
+        for a complete fetch."""
         mocker.patch.object(
             client,
             "_fetch_page",
@@ -237,10 +246,11 @@ class TestFECClientPagination:
             side_effect=mock_safe_fetch,
         )
 
-        results = await client._paginate("http://test", {})
+        with pytest.raises(PartialFetchError) as exc_info:
+            await client._paginate("http://test", {})
 
-        assert len(results) == 2
-        assert [r["id"] for r in results] == [1, 3]
+        assert [r["id"] for r in exc_info.value.results] == [1, 3]
+        assert exc_info.value.failed_pages == [2]
 
     async def test_paginate_short_circuits_on_single_page(self, client, mocker):
         """Should not trigger workers or gather if only one page exists."""

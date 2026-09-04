@@ -5,7 +5,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from civic_lantern.db.models.ingestion_run import IngestionRunStatus
 from civic_lantern.jobs.base_ingestor import BaseIngestor
+from civic_lantern.services.fec_exceptions import PartialFetchError
 
 
 class FakeIngestor(BaseIngestor):
@@ -13,12 +15,23 @@ class FakeIngestor(BaseIngestor):
 
     entity_name = "fake"
 
-    def __init__(self, client, session, *, fetch_return=None, transform_return=None):
+    def __init__(
+        self,
+        client,
+        session,
+        *,
+        fetch_return=None,
+        transform_return=None,
+        fetch_error=None,
+    ):
         super().__init__(client, session)
         self._fetch_return = fetch_return or []
         self._transform_return = transform_return or []
+        self._fetch_error = fetch_error
 
     async def fetch(self, start_date: str, end_date: str, **kwargs: Any) -> list:
+        if self._fetch_error:
+            raise self._fetch_error
         return self._fetch_return
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
@@ -77,6 +90,70 @@ class TestBaseIngestorWorkflow:
 
         assert stats["inserted"] == 1
         assert stats["errors"] == 0
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_partial_fetch_error_ingests_partial_data_as_partial_success(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """A PartialFetchError's records still get ingested, but the run is
+        marked PARTIAL_SUCCESS so the watermark isn't advanced past the gap.
+        """
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            transform_return=["validated_obj"],
+            fetch_error=PartialFetchError(
+                "1/3 pages failed for fake", results=[{"id": "1"}], failed_pages=[2]
+            ),
+        )
+
+        stats = await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        assert stats["inserted"] == 1
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row,
+            status=IngestionRunStatus.PARTIAL_SUCCESS,
+            error_message="1/3 pages failed for fake",
+        )
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_upsert_errors_mark_partial_success(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """Row-level upsert errors (e.g. FK violations) shouldn't be silently
+        reported as a clean success — that would advance the watermark past
+        data that never actually landed."""
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=["validated_obj"],
+        )
+        partial_service = AsyncMock()
+        partial_service.upsert_batch.return_value = {
+            "inserted": 0,
+            "updated": 0,
+            "errors": 1,
+            "failed_ids": ["bad-id"],
+        }
+        ingestor.create_service = lambda: partial_service
+
+        stats = await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        assert stats["errors"] == 1
+        status_call = mock_tracker.complete_run.await_args
+        assert status_call.kwargs["status"] == IngestionRunStatus.PARTIAL_SUCCESS
+        assert "bad-id" in status_call.kwargs["error_message"]
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_empty_transform_returns_none(
@@ -186,7 +263,7 @@ class TestBaseIngestorWorkflow:
     async def test_failure_rolls_back_before_recording(
         self, MockRunService, mock_client, mock_session
     ):
-        """Session is rolled back before complete_run(success=False).
+        """Session is rolled back before complete_run(status=FAILED).
 
         Otherwise, if the failing exception left the session's transaction
         aborted, complete_run's own commit() would raise too — masking the
@@ -227,7 +304,9 @@ class TestBaseIngestorWorkflow:
         await ingestor.run(cycle=2024)
 
         mock_tracker.start_run.assert_awaited_once_with("fake_cycle_scoped", 2024)
-        mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row, status=IngestionRunStatus.SUCCESS, error_message=None
+        )
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_run_records_failure_with_error_message(
@@ -253,7 +332,7 @@ class TestBaseIngestorWorkflow:
             await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
 
         mock_tracker.complete_run.assert_awaited_once_with(
-            run_row, success=False, error_message="DB gone"
+            run_row, status=IngestionRunStatus.FAILED, error_message="DB gone"
         )
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
@@ -276,7 +355,9 @@ class TestBaseIngestorWorkflow:
         result = await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
 
         assert result is None
-        mock_tracker.complete_run.assert_awaited_once_with(run_row, success=True)
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row, status=IngestionRunStatus.SUCCESS, error_message=None
+        )
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_run_strips_date_kwargs_for_cycle_scoped_ingestors(

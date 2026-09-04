@@ -6,9 +6,11 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from civic_lantern.db.models.ingestion_run import IngestionRunStatus
 from civic_lantern.services.data.base import BaseService
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
+from civic_lantern.services.fec_exceptions import PartialFetchError
 
 # FEC operates on the US/Eastern filing calendar
 FEC_TIMEZONE = ZoneInfo("America/New_York")
@@ -52,13 +54,34 @@ class BaseIngestor(ABC):
         run_tracker = IngestionRunService(self.session)
         run_row = await run_tracker.start_run(self.entity_name, cycle)
 
+        partial_note = None
         try:
-            raw_data = await self.fetch(**kwargs)
+            try:
+                raw_data = await self.fetch(**kwargs)
+            except PartialFetchError as e:
+                # Some pages failed even after retries. Don't discard the
+                # pages that did succeed — but the run can't be a clean
+                # SUCCESS, since resuming from a watermark set now would
+                # permanently skip whatever those pages held.
+                self.logger.warning(
+                    f"{self.entity_name}: {e}; "
+                    f"ingesting {len(e.results)} records fetched so far"
+                )
+                raw_data = e.results
+                partial_note = str(e)
+
             transformed = self.transform(raw_data)
 
             if not transformed:
                 self.logger.info(f"No {self.entity_name} found to ingest.")
-                await run_tracker.complete_run(run_row, success=True)
+                status = (
+                    IngestionRunStatus.PARTIAL_SUCCESS
+                    if partial_note
+                    else IngestionRunStatus.SUCCESS
+                )
+                await run_tracker.complete_run(
+                    run_row, status=status, error_message=partial_note
+                )
                 return None
 
             service = self.create_service()
@@ -69,7 +92,27 @@ class BaseIngestor(ABC):
                 f"{stats['updated']} updated, "
                 f"{stats['errors']} errors"
             )
-            await run_tracker.complete_run(run_row, success=True)
+
+            error_message = partial_note
+            if stats["errors"]:
+                failed_ids = stats["failed_ids"]
+                preview = failed_ids[:20]
+                extra = len(failed_ids) - 20
+                suffix = f" (+{extra} more)" if extra > 0 else ""
+                upsert_note = (
+                    f"{stats['errors']} row(s) failed to upsert: {preview}{suffix}"
+                )
+                error_message = (
+                    f"{error_message}; {upsert_note}" if error_message else upsert_note
+                )
+            status = (
+                IngestionRunStatus.PARTIAL_SUCCESS
+                if error_message
+                else IngestionRunStatus.SUCCESS
+            )
+            await run_tracker.complete_run(
+                run_row, status=status, error_message=error_message
+            )
             return stats
         except Exception as e:
             self.logger.error(
@@ -80,7 +123,9 @@ class BaseIngestor(ABC):
             # first, or complete_run's own commit() would raise too, masking
             # this error and leaving the row stuck IN_PROGRESS.
             await self.session.rollback()
-            await run_tracker.complete_run(run_row, success=False, error_message=str(e))
+            await run_tracker.complete_run(
+                run_row, status=IngestionRunStatus.FAILED, error_message=str(e)
+            )
             raise
 
     @property

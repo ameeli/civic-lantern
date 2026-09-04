@@ -55,7 +55,7 @@ class TestCompleteRun:
         )
         service = IngestionRunService(mock_session)
 
-        await service.complete_run(run, success=True)
+        await service.complete_run(run, status=IngestionRunStatus.SUCCESS)
 
         assert run.status == IngestionRunStatus.SUCCESS
         assert run.error_message is None
@@ -72,10 +72,32 @@ class TestCompleteRun:
         )
         service = IngestionRunService(mock_session)
 
-        await service.complete_run(run, success=False, error_message="FEC API down")
+        await service.complete_run(
+            run, status=IngestionRunStatus.FAILED, error_message="FEC API down"
+        )
 
         assert run.status == IngestionRunStatus.FAILED
         assert run.error_message == "FEC API down"
+        assert run.last_run_completed_at is None
+
+    async def test_partial_success_records_error_and_leaves_watermark_untouched(
+        self, mock_session: AsyncMock
+    ):
+        run = IngestionRun(
+            ingestor_name="candidates",
+            status=IngestionRunStatus.IN_PROGRESS,
+            last_run_completed_at=None,
+        )
+        service = IngestionRunService(mock_session)
+
+        await service.complete_run(
+            run,
+            status=IngestionRunStatus.PARTIAL_SUCCESS,
+            error_message="2/10 pages failed",
+        )
+
+        assert run.status == IngestionRunStatus.PARTIAL_SUCCESS
+        assert run.error_message == "2/10 pages failed"
         assert run.last_run_completed_at is None
 
 
