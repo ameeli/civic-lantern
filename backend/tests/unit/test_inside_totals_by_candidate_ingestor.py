@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from civic_lantern.jobs.ingestors.inside_totals_by_candidate import (
+    KNOWN_COMMITTEE_OVERRIDES,
     InsideTotalsByCandidateIngestor,
 )
 from civic_lantern.services.data.inside_totals_by_candidate import (
@@ -18,6 +19,7 @@ class TestInsideTotalsByCandidateIngestor:
         mock_client.get_candidate_totals.return_value = [
             {"candidate_id": "P001", "cycle": 2024}
         ]
+        mock_client.get_committee_totals.return_value = []
 
         ingestor = InsideTotalsByCandidateIngestor(
             client=mock_client, session=mock_session
@@ -25,7 +27,50 @@ class TestInsideTotalsByCandidateIngestor:
         result = await ingestor.fetch(cycle=2024)
 
         mock_client.get_candidate_totals.assert_awaited_once_with(cycle=2024)
-        assert result == [{"candidate_id": "P001", "cycle": 2024}]
+        assert {"candidate_id": "P001", "cycle": 2024} in result
+
+    async def test_fetch_merges_known_committee_overrides(
+        self, mock_client, mock_session
+    ):
+        """For a cycle with a known override, fetch() patches in a synthetic
+        row from that committee's own totals alongside the normal result."""
+        mock_client.get_candidate_totals.return_value = []
+        mock_client.get_committee_totals.return_value = [
+            {"receipts": 495853270.30, "disbursements": 471501651.83}
+        ]
+
+        ingestor = InsideTotalsByCandidateIngestor(
+            client=mock_client, session=mock_session
+        )
+        (candidate_id, cycle), committee_ids = next(
+            iter(KNOWN_COMMITTEE_OVERRIDES.items())
+        )
+
+        result = await ingestor.fetch(cycle=cycle)
+
+        mock_client.get_committee_totals.assert_awaited_once_with(
+            committee_ids[0], cycle=cycle
+        )
+        assert {
+            "candidate_id": candidate_id,
+            "cycle": cycle,
+            "receipts": 495853270.30,
+            "disbursements": 471501651.83,
+        } in result
+
+    async def test_fetch_skips_overrides_for_other_cycles(
+        self, mock_client, mock_session
+    ):
+        """A cycle with no known override doesn't call get_committee_totals."""
+        mock_client.get_candidate_totals.return_value = []
+
+        ingestor = InsideTotalsByCandidateIngestor(
+            client=mock_client, session=mock_session
+        )
+        result = await ingestor.fetch(cycle=1900)
+
+        mock_client.get_committee_totals.assert_not_awaited()
+        assert result == []
 
     async def test_fetch_without_cycle_raises_type_error(
         self, mock_client, mock_session

@@ -34,6 +34,9 @@ class FECClient:
         self.candidate_url = f"{self.base_url}/candidates/"
         self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
         self.committee_url = f"{self.base_url}/committees/"
+        self.committee_totals_url_tpl = (
+            f"{self.base_url}/committee/{{committee_id}}/totals/"
+        )
         self.schedule_e_totals_by_candidate_url = (
             f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
         )
@@ -175,6 +178,22 @@ class FECClient:
         committees = await self._paginate(self.committee_url, params)
         logger.info(f"✅ Fetched {len(committees)} committees")
         return committees
+
+    async def get_committee_totals(
+        self, committee_id: str, per_page: int = 100, **kwargs
+    ) -> list[dict]:
+        """Fetch a single committee's own totals, keyed by committee_id
+        rather than candidate_id. Used to patch in committees that FEC's
+        candidate-totals endpoint no longer associates with a candidate
+        (see inside_totals_by_candidate.py's KNOWN_COMMITTEE_OVERRIDES)."""
+        params = {"api_key": self.api_key, "per_page": per_page, **kwargs}
+        url = self.committee_totals_url_tpl.format(committee_id=committee_id)
+
+        totals = await self._paginate(url, params)
+        logger.info(
+            f"✅ Fetched {len(totals)} totals row(s) for committee {committee_id}"
+        )
+        return totals
 
     async def get_candidate_totals(
         self,
