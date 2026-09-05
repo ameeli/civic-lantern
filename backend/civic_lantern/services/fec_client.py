@@ -209,6 +209,7 @@ class FECClient:
             "election_full": "false",
             "per_page": per_page,
             "office": office,
+            "sort": "candidate_id",
             **kwargs,
         }
 
