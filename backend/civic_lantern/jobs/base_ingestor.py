@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -114,6 +115,21 @@ class BaseIngestor(ABC):
                 run_row, status=status, error_message=error_message
             )
             return stats
+        except asyncio.CancelledError:
+            # SIGTERM (e.g. a cancelled GitHub Actions run) is translated
+            # into task cancellation by ingestion.py's signal handler, which
+            # raises CancelledError here instead of killing the process
+            # outright. Record it so the row doesn't stay IN_PROGRESS
+            # forever, then re-raise — swallowing cancellation breaks
+            # asyncio's cancellation contract for anything awaiting this.
+            self.logger.warning(f"{self.entity_name} ingestion cancelled")
+            await self.session.rollback()
+            await run_tracker.complete_run(
+                run_row,
+                status=IngestionRunStatus.CANCELLED,
+                error_message="Run was cancelled",
+            )
+            raise
         except Exception as e:
             self.logger.error(
                 f"{self.entity_name} ingestion failed: {e}", exc_info=True

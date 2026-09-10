@@ -336,6 +336,40 @@ class TestBaseIngestorWorkflow:
         )
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_cancellation_records_cancelled_status_and_reraises(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """asyncio.CancelledError (e.g. from a SIGTERM-triggered task.cancel())
+        is recorded as CANCELLED, rolled back, and re-raised — not swallowed,
+        and not left stuck at IN_PROGRESS."""
+        import asyncio
+
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            fetch_return=[{"id": "1"}],
+            transform_return=["validated_obj"],
+        )
+        cancelling_service = AsyncMock()
+        cancelling_service.upsert_batch.side_effect = asyncio.CancelledError()
+        ingestor.create_service = lambda: cancelling_service
+
+        with pytest.raises(asyncio.CancelledError):
+            await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        mock_session.rollback.assert_awaited_once()
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row,
+            status=IngestionRunStatus.CANCELLED,
+            error_message="Run was cancelled",
+        )
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_run_records_success_even_with_empty_transform(
         self, MockRunService, mock_client, mock_session
     ):

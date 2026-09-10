@@ -14,6 +14,7 @@ class IngestionRunStatus(str, Enum):
     SUCCESS = "success"
     PARTIAL_SUCCESS = "partial_success"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class IngestionRun(Base, TimestampMixin):

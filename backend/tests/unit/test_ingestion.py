@@ -1,8 +1,10 @@
+import asyncio
+import signal
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from civic_lantern.jobs.ingestion import ingest, main, run_nightly
+from civic_lantern.jobs.ingestion import _run_cancellable, ingest, main, run_nightly
 
 
 @pytest.mark.unit
@@ -151,3 +153,63 @@ class TestMainEntryPoint:
         main(argv=["--entities", "candidates, committees"])
 
         mock_ingest.assert_awaited_once_with(entities=["candidates", "committees"])
+
+    @patch("civic_lantern.jobs.ingestion.configure_logging")
+    @patch("civic_lantern.jobs.ingestion.run_nightly", new_callable=AsyncMock)
+    def test_main_exits_cleanly_on_cancellation(
+        self, mock_run_nightly, mock_configure_logging
+    ):
+        """A SIGTERM-triggered cancellation exits with code 1 instead of an
+        uncaught CancelledError traceback."""
+        mock_run_nightly.side_effect = asyncio.CancelledError()
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(argv=[])
+
+        assert exc_info.value.code == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestRunCancellable:
+    """_run_cancellable wires SIGTERM to task cancellation instead of an
+    abrupt process kill, so BaseIngestor.run() gets a chance to record a
+    CANCELLED status before the process exits."""
+
+    async def test_returns_result_normally(self):
+        async def coro():
+            return "done"
+
+        assert await _run_cancellable(coro()) == "done"
+
+    async def test_reraises_cancelled_error(self):
+        async def coro():
+            raise asyncio.CancelledError()
+
+        with pytest.raises(asyncio.CancelledError):
+            await _run_cancellable(coro())
+
+    async def test_sigterm_handler_cancels_the_running_task(self, mocker):
+        """The callback registered for SIGTERM is the inner task's cancel(),
+        so simulating signal delivery actually cancels the in-flight coroutine
+        rather than being a no-op."""
+        loop = asyncio.get_running_loop()
+        registered = {}
+        mocker.patch.object(
+            loop,
+            "add_signal_handler",
+            side_effect=lambda sig, cb: registered.__setitem__(sig, cb),
+        )
+        mocker.patch.object(loop, "remove_signal_handler")
+
+        async def coro():
+            await asyncio.sleep(10)
+
+        outer_task = asyncio.ensure_future(_run_cancellable(coro()))
+        await asyncio.sleep(0)  # let _run_cancellable register the handler
+        assert signal.SIGTERM in registered
+
+        registered[signal.SIGTERM]()  # simulate the OS delivering SIGTERM
+
+        with pytest.raises(asyncio.CancelledError):
+            await outer_task
