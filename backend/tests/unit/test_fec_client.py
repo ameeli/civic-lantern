@@ -143,6 +143,78 @@ class TestFECClientRequiresExplicitCycle:
         with pytest.raises(TypeError):
             await client.get_candidate_schedule_e_totals()
 
+    async def test_get_committee_reports_without_cycle_raises(self, client):
+        with pytest.raises(TypeError):
+            await client.get_committee_reports("C00703975")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestFECClientGetCommitteeReports:
+    """get_committee_reports fetches a committee's periodic filed reports."""
+
+    @respx.mock
+    async def test_calls_correct_url_and_params(self, client):
+        url = client.committee_reports_url_tpl.format(committee_id="C00703975")
+        route = respx.get(url__startswith=url).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "coverage_start_date": "2024-07-01",
+                            "coverage_end_date": "2024-07-31",
+                            "total_receipts_period": 204488910.82,
+                            "total_disbursements_period": 80718189.89,
+                            "most_recent": True,
+                        }
+                    ],
+                    "pagination": {"pages": 1},
+                },
+            )
+        )
+
+        results = await client.get_committee_reports("C00703975", cycle=2024)
+
+        assert len(route.calls) == 1
+        request_params = route.calls[0].request.url.params
+        assert request_params["cycle"] == "2024"
+        assert request_params["sort"] == "coverage_start_date"
+        assert len(results) == 1
+        assert results[0]["total_receipts_period"] == 204488910.82
+
+    @respx.mock
+    async def test_returns_raw_rows_including_superseded_amendments(self, client):
+        """Filtering by most_recent is the caller's job, not the client's."""
+        url = client.committee_reports_url_tpl.format(committee_id="C00703975")
+        respx.get(url__startswith=url).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "coverage_start_date": "2024-07-01",
+                            "coverage_end_date": "2024-07-31",
+                            "total_receipts_period": 100.0,
+                            "most_recent": False,
+                        },
+                        {
+                            "coverage_start_date": "2024-07-01",
+                            "coverage_end_date": "2024-07-31",
+                            "total_receipts_period": 204488910.82,
+                            "most_recent": True,
+                        },
+                    ],
+                    "pagination": {"pages": 1},
+                },
+            )
+        )
+
+        results = await client.get_committee_reports("C00703975", cycle=2024)
+
+        assert len(results) == 2
+        assert {r["most_recent"] for r in results} == {True, False}
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio

@@ -37,6 +37,9 @@ class FECClient:
         self.committee_totals_url_tpl = (
             f"{self.base_url}/committee/{{committee_id}}/totals/"
         )
+        self.committee_reports_url_tpl = (
+            f"{self.base_url}/committee/{{committee_id}}/reports/"
+        )
         self.schedule_e_totals_by_candidate_url = (
             f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
         )
@@ -194,6 +197,38 @@ class FECClient:
             f"✅ Fetched {len(totals)} totals row(s) for committee {committee_id}"
         )
         return totals
+
+    async def get_committee_reports(
+        self, committee_id: str, cycle: int, per_page: int = 100, **kwargs
+    ) -> list[dict]:
+        """Fetch a committee's periodic filed reports (e.g. Form 3P), each
+        scoped to a coverage period with period-specific totals rather than
+        totals cumulative to-date. Used to apportion a redesignated
+        committee's activity between two candidate_ids it's shared across a
+        split date (see inside_totals_by_candidate.py's
+        KNOWN_COMMITTEE_SPLITS).
+
+        A coverage period may appear multiple times if amended. FEC flags
+        exactly one row per (coverage_start_date, coverage_end_date) as
+        `most_recent: true` — callers must filter on that flag to avoid
+        double-counting superseded versions; this method returns raw rows
+        unfiltered.
+        """
+        params = {
+            "api_key": self.api_key,
+            "cycle": cycle,
+            "per_page": per_page,
+            "sort": "coverage_start_date",
+            **kwargs,
+        }
+        url = self.committee_reports_url_tpl.format(committee_id=committee_id)
+
+        reports = await self._paginate(url, params)
+        logger.info(
+            f"✅ Fetched {len(reports)} report row(s) for committee "
+            f"{committee_id} cycle {cycle}"
+        )
+        return reports
 
     async def get_candidate_totals(
         self,
