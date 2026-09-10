@@ -1,7 +1,8 @@
+import argparse
 import asyncio
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from civic_lantern.jobs.manager import IngestionManager
 from civic_lantern.utils.logging import configure_logging
@@ -39,10 +40,26 @@ async def run_nightly() -> Dict[str, Any]:
         return await manager.run_nightly()
 
 
-def main() -> None:
-    """CLI entrypoint for the nightly GitHub Actions workflow."""
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    """CLI entrypoint for both the nightly GitHub Actions workflow (no args)
+    and manually-triggered one-off runs (--entities/--cycle).
+
+    `argv` defaults to None, which tells argparse to read `sys.argv[1:]` —
+    pass an explicit list (e.g. []) in tests to avoid parsing pytest's own
+    command-line arguments.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--entities", help="Comma-separated entity names")
+    parser.add_argument("--cycle", type=int, help="Cycle year, if applicable")
+    args = parser.parse_args(argv)
+
     configure_logging()
-    results = asyncio.run(run_nightly())
+    if args.entities:
+        entities = [e.strip() for e in args.entities.split(",") if e.strip()]
+        kwargs = {"cycle": args.cycle} if args.cycle else {}
+        results = asyncio.run(ingest(entities=entities, **kwargs))
+    else:
+        results = asyncio.run(run_nightly())
 
     failed = [
         name

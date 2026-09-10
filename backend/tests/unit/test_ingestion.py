@@ -64,7 +64,11 @@ class TestRunNightlyEntryPoint:
 
 @pytest.mark.unit
 class TestMainEntryPoint:
-    """Test the main() CLI entrypoint's exit-code behavior."""
+    """Test the main() CLI entrypoint's exit-code behavior.
+
+    argv=[] is passed explicitly so argparse doesn't try to parse pytest's
+    own command-line arguments.
+    """
 
     @patch("civic_lantern.jobs.ingestion.configure_logging")
     @patch("civic_lantern.jobs.ingestion.run_nightly", new_callable=AsyncMock)
@@ -73,7 +77,7 @@ class TestMainEntryPoint:
     ):
         mock_run_nightly.return_value = {"committees": {"inserted": 1, "errors": 0}}
 
-        main()  # should not raise / should not call sys.exit
+        main(argv=[])  # should not raise / should not call sys.exit
 
         mock_configure_logging.assert_called_once()
 
@@ -88,7 +92,7 @@ class TestMainEntryPoint:
         }
 
         with pytest.raises(SystemExit) as exc_info:
-            main()
+            main(argv=[])
 
         assert exc_info.value.code == 1
 
@@ -99,4 +103,51 @@ class TestMainEntryPoint:
     ):
         mock_run_nightly.return_value = {"skipped": "overlap_guard"}
 
-        main()  # should not raise
+        main(argv=[])  # should not raise
+
+    @patch("civic_lantern.jobs.ingestion.configure_logging")
+    @patch("civic_lantern.jobs.ingestion.run_nightly", new_callable=AsyncMock)
+    def test_main_with_no_args_runs_nightly(
+        self, mock_run_nightly, mock_configure_logging
+    ):
+        """No --entities means the nightly cron trigger's behavior is unchanged."""
+        mock_run_nightly.return_value = {}
+
+        main(argv=[])
+
+        mock_run_nightly.assert_awaited_once()
+
+    @patch("civic_lantern.jobs.ingestion.configure_logging")
+    @patch("civic_lantern.jobs.ingestion.ingest", new_callable=AsyncMock)
+    def test_main_with_entities_runs_scoped_ingest(
+        self, mock_ingest, mock_configure_logging
+    ):
+        """--entities (with an optional --cycle) calls ingest() instead of
+        run_nightly(), scoped to just what was asked for."""
+        mock_ingest.return_value = {"inside_totals_by_candidate": {"errors": 0}}
+
+        main(argv=["--entities", "inside_totals_by_candidate", "--cycle", "2024"])
+
+        mock_ingest.assert_awaited_once_with(
+            entities=["inside_totals_by_candidate"], cycle=2024
+        )
+
+    @patch("civic_lantern.jobs.ingestion.configure_logging")
+    @patch("civic_lantern.jobs.ingestion.ingest", new_callable=AsyncMock)
+    def test_main_with_entities_and_no_cycle(self, mock_ingest, mock_configure_logging):
+        """--cycle is optional — omitting it doesn't pass cycle=None through."""
+        mock_ingest.return_value = {}
+
+        main(argv=["--entities", "candidates"])
+
+        mock_ingest.assert_awaited_once_with(entities=["candidates"])
+
+    @patch("civic_lantern.jobs.ingestion.configure_logging")
+    @patch("civic_lantern.jobs.ingestion.ingest", new_callable=AsyncMock)
+    def test_main_with_multiple_entities(self, mock_ingest, mock_configure_logging):
+        """Comma-separated --entities splits into a list, trimming whitespace."""
+        mock_ingest.return_value = {}
+
+        main(argv=["--entities", "candidates, committees"])
+
+        mock_ingest.assert_awaited_once_with(entities=["candidates", "committees"])
