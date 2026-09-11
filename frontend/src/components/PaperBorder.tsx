@@ -7,7 +7,7 @@ function hexToRgb01(hex: string) {
   };
 }
 
-export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
+export default function PaperBorder({ color = "#f3edd9" }: { color?: string }) {
   const { r, g, b } = hexToRgb01(color);
   return (
     <svg
@@ -15,37 +15,9 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
       width="100%"
       height="100%"
       aria-hidden="true"
-      className="absolute inset-0 pointer-events-none -z-10 opacity-65"
+      className="absolute inset-0 pointer-events-none -z-10 opacity-45"
     >
       <defs>
-        {/* Edge warp */}
-        <filter id="warp" x="-5%" y="-5%" width="110%" height="110%">
-          <feMorphology
-            in="SourceGraphic"
-            operator="erode"
-            radius="25"
-            result="eroded"
-          />
-          <feTurbulence
-            type="turbulence"
-            baseFrequency="0.032"
-            numOctaves="4"
-            seed="5"
-            result="n"
-          />
-          <feDisplacementMap
-            in="eroded"
-            in2="n"
-            scale="7"
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
-        </filter>
-
-        <mask id="paper-edge">
-          <rect width="100%" height="100%" fill="white" filter="url(#warp)" />
-        </mask>
-
         {/* Paper texture */}
         <filter
           id="paper"
@@ -145,10 +117,7 @@ export default function PaperBorder({ color = "#e2d7b8" }: { color?: string }) {
         </filter>
       </defs>
 
-      {/* Paper texture with warped edges — fills the full container */}
-      <g mask="url(#paper-edge)">
-        <rect width="100%" height="100%" filter="url(#paper)" />
-      </g>
+      <rect width="100%" height="100%" filter="url(#paper)" />
     </svg>
   );
 }

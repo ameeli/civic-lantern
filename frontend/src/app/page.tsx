@@ -7,9 +7,6 @@ import PaperBorder from "@/components/PaperBorder";
 import { listReadyCycles } from "@/api/spending";
 import { resolveCycle } from "@/utils/resolveCycle";
 
-// This page fetches live spending data from an external backend on every
-// load. Prerendering it at build time couples build success to that
-// backend being reachable right then — force per-request rendering instead.
 export const dynamic = "force-dynamic";
 
 function Masthead() {
@@ -28,13 +25,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const readyCycles = await listReadyCycles();
   const cycle = resolveCycle(params.cycle, readyCycles);
 
-  // No cycle has ever finished ingesting yet (e.g. a fresh deploy before
-  // the first successful nightly run) — nothing to select or show.
   if (cycle === undefined) {
     return (
-      <div className="flex flex-col flex-1 items-center bg-dark-wood font-sans">
-        <main className="relative isolate grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-6xl my-2 p-12 lg:p-15">
-          <PaperBorder />
+      <div className="relative isolate flex flex-col flex-1 items-center bg-dark-wood font-sans">
+        <PaperBorder />
+        <main className="grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-6xl my-2 p-12 lg:p-15">
           <Masthead />
           <div className="col-span-12 text-center text-body-justify">
             No election cycle data available yet.
@@ -45,13 +40,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   }
 
   return (
-    <div className="flex flex-col flex-1 items-center bg-dark-wood font-sans">
-      <main className="relative isolate grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-6xl my-2 p-12 lg:p-15">
-        <PaperBorder />
+    <div className="relative isolate flex flex-col flex-1 items-center bg-dark-wood font-sans">
+      <PaperBorder />
+      <main className="grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-7xl p-12 lg:p-15 ">
         <Masthead />
         <div className="col-span-12 mb-3 flex flex-col items-center gap-2">
           <h1 className="font-headline font-semibold text-3xl text-center">
-            Direct vs. Outside Money: Federal Campaign Spending Breakdowns
+            Candidate Cash vs. Super PAC Millions: Who Truly Controls the
+            Election Narrative?
           </h1>
           <CycleSelector cycles={readyCycles} selectedCycle={cycle} />
         </div>
