@@ -98,7 +98,7 @@
 }
 
 @utility border-ink-thin {
-  border: 2px solid color-mix(in srgb, var(--color-ink) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 50%, transparent);
   border-radius: 5px;
 }
 

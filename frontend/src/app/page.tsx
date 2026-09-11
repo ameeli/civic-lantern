@@ -9,10 +9,55 @@ import { resolveCycle } from "@/utils/resolveCycle";
 
 export const dynamic = "force-dynamic";
 
-function Masthead() {
+function ordinalSuffix(day: number) {
+  if (day >= 11 && day <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
+function formatMastheadDate(date: Date) {
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+  const month = date.toLocaleDateString("en-US", { month: "long" });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${weekday}, ${month} ${day}${ordinalSuffix(day)}, ${year}`;
+}
+
+function Masthead({
+  cycles,
+  selectedCycle,
+}: {
+  cycles?: number[];
+  selectedCycle?: number;
+}) {
+  const dateLine = formatMastheadDate(new Date());
   return (
-    <div className="col-span-12 flex flex-col items-center gap-5 mt-4 lg:mt-0">
-      <h1 className="text-masthead text-3xl">The Civic Lantern</h1>
+    <div className="col-span-12 flex flex-col items-center lg:mt-0">
+      <div className="relative w-full flex justify-center mb-6">
+        <div className="hidden lg:flex absolute left-0 bottom-0 flex-col text-md font-medium leading-tight">
+          <span>{dateLine}</span>
+        </div>
+        <h1 className="text-masthead text-3xl">The Civic Lantern</h1>
+        {cycles && selectedCycle !== undefined && (
+          <div className="hidden lg:flex absolute right-0 bottom-0">
+            <CycleSelector cycles={cycles} selectedCycle={selectedCycle} />
+          </div>
+        )}
+      </div>
+      <div className="flex lg:hidden flex-col items-center text-md font-medium leading-tight">
+        <span>{dateLine}</span>
+        {cycles && selectedCycle !== undefined && (
+          <CycleSelector cycles={cycles} selectedCycle={selectedCycle} />
+        )}
+      </div>
       <MastheadRule>
         <Gavel width={40} height={40} />
       </MastheadRule>
@@ -43,13 +88,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <div className="relative isolate flex flex-col flex-1 items-center bg-dark-wood font-sans">
       <PaperBorder />
       <main className="grid grid-cols-12 content-start gap-x-4 gap-y-1 w-full max-w-7xl p-12 lg:p-15 ">
-        <Masthead />
+        <Masthead cycles={readyCycles} selectedCycle={cycle} />
         <div className="col-span-12 mb-3 flex flex-col items-center gap-2">
           <h1 className="font-headline font-semibold text-3xl text-center">
             Candidate Cash vs. Super PAC Millions: Who Truly Controls the
             Election Narrative?
           </h1>
-          <CycleSelector cycles={readyCycles} selectedCycle={cycle} />
         </div>
         <ElectionSpendingSection cycle={cycle} />
         <SpendingPackChartSection cycle={cycle} />

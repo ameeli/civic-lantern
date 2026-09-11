@@ -20,13 +20,13 @@ export default function CycleSelector({
   }
 
   return (
-    <label className="flex items-center gap-2 font-headline text-sm font-semibold">
+    <label className="flex items-center gap-2 text-md font-medium">
       Election Cycle:
       <select
         aria-label="Election Cycle"
         value={selectedCycle}
         onChange={handleChange}
-        className="border-ink-thin bg-transparent px-2 py-1 font-headline text-sm cursor-pointer"
+        className="border-ink-thin bg-transparent px-2 py-1 text-md cursor-pointer"
       >
         {cycles.map((cycle) => (
           <option key={cycle} value={cycle}>
