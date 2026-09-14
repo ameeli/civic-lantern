@@ -91,8 +91,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         <Masthead cycles={readyCycles} selectedCycle={cycle} />
         <div className="col-span-12 mb-3 flex flex-col items-center gap-2">
           <h1 className="font-headline font-semibold text-3xl text-center">
-            Candidate vs. Super PAC Cash: Who Truly Controls the Election
-            Narrative?
+            Candidate vs. Super PAC Cash: Who Controls the Election Narrative?
           </h1>
         </div>
         <ElectionSpendingSection cycle={cycle} />
