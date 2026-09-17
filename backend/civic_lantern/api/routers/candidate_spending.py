@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.api.deps import PaginationParams, get_db
+from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.schemas.candidate_spending import (
     CandidateSpendingList,
     SpendingSortBy,
@@ -19,6 +20,9 @@ async def list_candidate_spending(
     sort_by: SpendingSortBy = Query("total_spending", description="Field to sort by"),
     order: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
     cycle: Optional[int] = Query(None, description="Filter by election cycle"),
+    office: Optional[OfficeTypeEnum] = Query(
+        None, description="Filter by office code (P, S, H)"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     """List spending totals for all candidates with pagination."""
@@ -29,4 +33,5 @@ async def list_candidate_spending(
         sort_by=sort_by,
         order=order,
         cycle=cycle,
+        office=office,
     )

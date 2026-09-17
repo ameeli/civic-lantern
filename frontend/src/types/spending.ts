@@ -48,10 +48,14 @@ export type SpendingSortBy =
   | "influence_ratio"
   | "vulnerability_factor";
 
+/** Federal office codes, matching the backend's OfficeTypeEnum. */
+export type OfficeCode = "P" | "S" | "H";
+
 export interface CandidateSpendingParams {
   cycle?: number;
   limit?: number;
   offset?: number;
   sort_by?: SpendingSortBy;
   order?: "asc" | "desc";
+  office?: OfficeCode;
 }
