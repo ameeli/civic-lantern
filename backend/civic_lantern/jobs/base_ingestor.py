@@ -178,12 +178,15 @@ class BaseIngestor(ABC):
         once; every subsequent run resumes from the watermark it sets.
         """
         now_et = datetime.now(FEC_TIMEZONE)
+
         if not end_date:
             end_date = now_et.strftime("%Y-%m-%d")
         if not start_date:
             watermark = await IngestionRunService(self.session).get_watermark(
                 self.entity_name
             )
+            await self.session.commit()
+
             start_date = (
                 watermark.astimezone(FEC_TIMEZONE).strftime("%Y-%m-%d")
                 if watermark

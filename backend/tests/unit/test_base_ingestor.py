@@ -202,6 +202,9 @@ class TestBaseIngestorWorkflow:
         assert start is None
         assert end == "2025-06-15"
         mock_dt.now.assert_called_once_with(fec_tz)
+        # The watermark read must not leave the connection checked out
+        # across fetch()'s subsequent (potentially hours-long) FEC pull.
+        mock_session.commit.assert_awaited_once()
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_resolve_dates_uses_watermark_when_present(
@@ -224,6 +227,7 @@ class TestBaseIngestorWorkflow:
         assert start == "2025-06-10"
         assert end == "2025-06-15"
         MockRunService.return_value.get_watermark.assert_awaited_once_with("fake")
+        mock_session.commit.assert_awaited_once()
 
     async def test_provided_dates_pass_through(self, mock_client, mock_session):
         """Explicit dates are not overridden, and no watermark lookup happens."""
@@ -236,6 +240,7 @@ class TestBaseIngestorWorkflow:
 
         assert start == "2024-03-01"
         assert end == "2024-09-01"
+        mock_session.commit.assert_not_awaited()
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_upsert_error_propagates(

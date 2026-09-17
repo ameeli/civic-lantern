@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from civic_lantern.core.cycles import active_cycles
-from civic_lantern.db.session import AsyncSessionLocal
+from civic_lantern.db.session import JobSessionLocal
 from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY, SPENDING_INGESTOR_NAMES
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
@@ -66,7 +66,7 @@ class IngestionManager:
                 f"Unknown entity: '{entity}'. Available: {list(INGESTOR_REGISTRY)}"
             )
 
-        async with AsyncSessionLocal() as session:
+        async with JobSessionLocal() as session:
             ingestor = ingestor_cls(client=self._client, session=session)
             return await ingestor.run(
                 start_date=start_date, end_date=end_date, **kwargs
@@ -125,7 +125,7 @@ class IngestionManager:
         rather than date-windowed. Guards against overlapping runs: a recent
         in-progress run blocks this one; a stale one self-heals first.
         """
-        async with AsyncSessionLocal() as session:
+        async with JobSessionLocal() as session:
             guard = IngestionRunService(session)
             if await guard.has_active_run(OVERLAP_TIMEOUT_MINUTES):
                 logger.warning("Overlap guard: a run is already in progress, skipping.")
@@ -160,7 +160,7 @@ class IngestionManager:
         mv_election_spending_summary since the latter sources from the former.
         CONCURRENTLY allows reads to continue during each refresh.
         """
-        async with AsyncSessionLocal() as session:
+        async with JobSessionLocal() as session:
             try:
                 await session.execute(
                     text(

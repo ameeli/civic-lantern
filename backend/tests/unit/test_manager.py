@@ -16,7 +16,7 @@ from civic_lantern.jobs.manager import (
 class TestIngestionManager:
     """Test the IngestionManager routing, lifecycle, and failure handling."""
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_routes_to_correct_ingestor(self, MockSession, manager):
         """ingest() looks up the entity in the registry and runs it."""
         mock_run = AsyncMock(return_value={"inserted": 1, "updated": 0, "errors": 0})
@@ -56,7 +56,7 @@ class TestIngestionManager:
 
         mock_client.__aexit__.assert_awaited_once()
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_runs_in_order(self, MockSession, manager):
         """ingest_batch() runs all ingestors in registry order."""
         call_order = []
@@ -87,7 +87,7 @@ class TestIngestionManager:
         assert "entity_a" in results
         assert "entity_b" in results
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_continues_on_failure(self, MockSession, manager):
         """A failed entity is recorded but doesn't block subsequent ones."""
 
@@ -114,7 +114,7 @@ class TestIngestionManager:
         assert "error" in results["failing"]
         assert results["succeeding"]["inserted"] == 5
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_refresh_spending_stats_uses_text(self, MockSession, manager):
         """refresh_spending_stats() issues two REFRESH statements via text()."""
         mock_session = AsyncMock()
@@ -131,7 +131,7 @@ class TestIngestionManager:
             for c in mock_session.execute.call_args_list
         )
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_refreshes_mv_on_spending_success(
         self, MockSession, manager
     ):
@@ -148,7 +148,7 @@ class TestIngestionManager:
 
         mock_refresh.assert_awaited_once()
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
         self, MockSession, manager
     ):
@@ -178,7 +178,7 @@ class TestIngestionManager:
 class TestRunNightly:
     """Test the nightly routine: overlap guard, then per-cycle spending loop."""
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
     async def test_skips_when_overlap_guard_active(
         self, MockRunService, MockSession, manager
@@ -196,7 +196,7 @@ class TestRunNightly:
         mock_ingest_batch.assert_not_awaited()
         MockRunService.return_value.reset_stale_runs.assert_not_awaited()
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
     async def test_resets_stale_runs_when_no_active_run(
         self, MockRunService, MockSession, manager
@@ -215,7 +215,7 @@ class TestRunNightly:
             OVERLAP_TIMEOUT_MINUTES
         )
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
     async def test_runs_date_windowed_once_and_spending_per_active_cycle(
         self, MockRunService, MockSession, manager
@@ -244,7 +244,7 @@ class TestRunNightly:
         assert "inside_totals_by_candidate:2024" in result
         assert "schedule_e_totals_by_candidate:2026" in result
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
     async def test_refreshes_mv_once_total_not_once_per_cycle(
         self, MockRunService, MockSession, manager
@@ -268,7 +268,7 @@ class TestRunNightly:
 
         mock_refresh.assert_awaited_once()
 
-    @patch("civic_lantern.jobs.manager.AsyncSessionLocal")
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
     async def test_skips_mv_refresh_when_no_active_cycles_succeed(
         self, MockRunService, MockSession, manager

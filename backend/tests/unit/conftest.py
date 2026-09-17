@@ -1,13 +1,21 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.jobs.manager import IngestionManager
 
 
 @pytest.fixture
 def mock_session() -> AsyncMock:
-    return AsyncMock()
+    """`spec=AsyncSession` matters here: without it, every attribute
+    (including sync methods like `.add()`) is auto-created as an AsyncMock,
+    so `self.db.add(run)` — correctly unawaited, since real `Session.add()`
+    is sync — leaves a coroutine never awaited, and pytest warns on it.
+    Speccing lets unittest.mock introspect AsyncSession and give each
+    attribute the right sync/async mock type.
+    """
+    return AsyncMock(spec=AsyncSession)
 
 
 @pytest.fixture
@@ -49,7 +57,8 @@ def scalars_first_result(item):
 
 
 def mappings_result(items):
-    """Mock a DB result where .mappings().all() → items and .mappings().first() → items[0]."""
+    """Mock a DB result where .mappings().all() → items and
+    .mappings().first() → items[0]."""
     mappings = MagicMock()
     mappings.all.return_value = items
     mappings.first.return_value = items[0] if items else None
