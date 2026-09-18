@@ -178,10 +178,14 @@ export default function CandidateRangeSlider({
   ).length;
 
   return (
-    <div className="flex flex-col items-center gap-1 font-headline select-none bg-cream-solid border-ink-thin px-4 py-2">
-      <span className="text-sm font-semibold italic text-breadcrumb-text">
+    <div className="flex flex-col items-center gap-0 font-headline select-none bg-cream-solid border-ink-thin px-4 py-2">
+      <span className="text-sm font-semibold italic text-breadcrumb-text -mb-4">
         Candidates in range: {count}
       </span>
+      <div className="flex justify-between w-full max-w-105 text-xs text-breadcrumb-text">
+        <span>{formatDollars(bounds.min)}</span>
+        <span>{formatDollars(bounds.max)}</span>
+      </div>
       <div className="relative w-full max-w-105 h-5" ref={trackRef}>
         <div className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2 border-ink-thin" />
         <div
@@ -191,10 +195,6 @@ export default function CandidateRangeSlider({
             width: `${Math.max(0, pct(live.max) - pct(live.min))}%`,
           }}
         />
-        <div className="flex justify-between w-full max-w-105 text-xs text-breadcrumb-text">
-          <span>{formatDollars(bounds.min)}</span>
-          <span>{formatDollars(bounds.max)}</span>
-        </div>
         <div
           role="slider"
           tabIndex={0}
