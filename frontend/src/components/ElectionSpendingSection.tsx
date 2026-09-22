@@ -39,10 +39,10 @@ function IndependentExpenditureTypes() {
       </h3>
       <p className="text-body-justify">
         <strong className="font-bold">Independent Support: </strong>
-        Promotes the candidate's record or platform to build voter approval.
+        Promotes the candidate&apos;s record or platform to build voter approval.
         <br />
         <strong className="font-bold">Independent Opposition: </strong>
-        Attacks the candidate's character or positions to discourage support.
+        Attacks the candidate&apos;s character or positions to discourage support.
       </p>
     </section>
   );

@@ -462,12 +462,20 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     return getDefaultRange(getPositiveSortedSpenders(data[focusedOfficeCode] ?? []));
   }, [data, focusedOfficeCode, activeRange]);
 
+  const showSlider = Boolean(
+    focusDepth === 1 && focusedOfficeCode && officeBounds && currentRange,
+  );
+
   return (
     <div
       className="relative top-2 w-full mx-auto"
       style={{ maxWidth: "800px" }}
     >
-      <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
+      <ChartBreadcrumb
+        path={breadcrumbPath}
+        onNavigate={handleNavigate}
+        align={showSlider ? "left" : "center"}
+      />
       <div
         ref={containerRef}
         className="w-[88%] mx-auto"
@@ -475,8 +483,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       >
         <svg ref={svgRef} width={width} height={height} />
       </div>
-      {focusDepth === 1 && focusedOfficeCode && officeBounds && currentRange && (
-        <div className="absolute bottom-3 w-[88%] left-1/2 -translate-x-1/2 flex justify-center z-10">
+      {showSlider && focusedOfficeCode && officeBounds && currentRange && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[88%] flex justify-center z-10 lg:top-3 lg:bottom-auto lg:left-auto lg:right-3 lg:translate-x-0 lg:w-[45%] lg:max-w-[260px] lg:justify-end">
           <CandidateRangeSlider
             key={focusedOfficeCode}
             bounds={officeBounds}

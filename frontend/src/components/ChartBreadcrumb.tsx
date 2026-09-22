@@ -3,14 +3,20 @@
 interface ChartBreadcrumbProps {
   path: string[];
   onNavigate: (depth: number) => void;
+  align?: "center" | "left";
 }
 
 export default function ChartBreadcrumb({
   path,
   onNavigate,
+  align = "center",
 }: ChartBreadcrumbProps) {
   return (
-    <nav className="absolute top-3 z-10 flex w-full justify-center items-center text-sm font-headline font-semibold italic">
+    <nav
+      className={`absolute top-3 z-10 flex w-full items-center text-sm font-headline font-semibold italic ${
+        align === "left" ? "justify-center lg:justify-start lg:pl-3" : "justify-center"
+      }`}
+    >
       {path.map((segment, i) => {
         const isLast = i === path.length - 1;
         const base =

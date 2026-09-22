@@ -178,7 +178,7 @@ export default function CandidateRangeSlider({
   ).length;
 
   return (
-    <div className="flex flex-col items-center gap-0 font-headline select-none bg-cream-solid border-ink-thin px-4 py-2">
+    <div className="flex flex-col items-center gap-0 font-headline select-none">
       <span className="text-sm font-semibold italic text-breadcrumb-text -mb-4">
         Candidates in range: {count}
       </span>
