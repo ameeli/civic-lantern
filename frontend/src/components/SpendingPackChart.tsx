@@ -212,10 +212,12 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .sum((d) => d.value)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
-    d3.pack<OfficeSizeDatum>()
+    d3
+      .pack<OfficeSizeDatum>()
       .size([width, height] as [number, number])
       .padding(3)(sizingRoot);
-    const sizedOffices = sizingRoot as d3.HierarchyCircularNode<OfficeSizeDatum>;
+    const sizedOffices =
+      sizingRoot as d3.HierarchyCircularNode<OfficeSizeDatum>;
 
     const packRoot = root as PackNode;
     packRoot.x = sizedOffices.x;
@@ -254,7 +256,9 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const dy = officeNode.y - packedSub.y;
 
       const byData = new Map<SpendingNode, PackNode>();
-      officeNode.descendants().forEach((d) => byData.set(d.data, d as PackNode));
+      officeNode
+        .descendants()
+        .forEach((d) => byData.set(d.data, d as PackNode));
 
       packedSub.descendants().forEach((d) => {
         if (d === packedSub) return; // office node itself — already positioned above
@@ -376,9 +380,10 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const targetOffice =
         target.depth === 0
           ? undefined
-          : (target.ancestors().find((n) => n.depth === 1)?.data as
-              | RaceNode
-              | undefined
+          : (
+              target.ancestors().find((n) => n.depth === 1)?.data as
+                | RaceNode
+                | undefined
             )?.code;
       setActiveRange((prev) =>
         prev && prev.office === targetOffice ? prev : null,
@@ -437,7 +442,9 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   }
 
   const focusedOfficeCode =
-    focusDepth === 1 ? (focusRef.current?.data as RaceNode | undefined)?.code : undefined;
+    focusDepth === 1
+      ? (focusRef.current?.data as RaceNode | undefined)?.code
+      : undefined;
   const officeSpends = useMemo(
     () =>
       focusedOfficeCode
@@ -450,7 +457,9 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   const officeBounds = useMemo(
     () =>
       focusedOfficeCode
-        ? getOfficeBounds(getPositiveSortedSpenders(data[focusedOfficeCode] ?? []))
+        ? getOfficeBounds(
+            getPositiveSortedSpenders(data[focusedOfficeCode] ?? []),
+          )
         : null,
     [data, focusedOfficeCode],
   );
@@ -459,7 +468,9 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     if (activeRange && activeRange.office === focusedOfficeCode) {
       return activeRange.range;
     }
-    return getDefaultRange(getPositiveSortedSpenders(data[focusedOfficeCode] ?? []));
+    return getDefaultRange(
+      getPositiveSortedSpenders(data[focusedOfficeCode] ?? []),
+    );
   }, [data, focusedOfficeCode, activeRange]);
 
   const showSlider = Boolean(
@@ -467,10 +478,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   );
 
   return (
-    <div
-      className="relative top-2 w-full mx-auto"
-      style={{ maxWidth: "800px" }}
-    >
+    <div className="w-full mx-auto max-w-200 py-4">
       <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
       <div
         ref={containerRef}
@@ -480,16 +488,18 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         <svg ref={svgRef} width={width} height={height} />
       </div>
       {showSlider && focusedOfficeCode && officeBounds && currentRange && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex justify-center w-[45%] max-w-[260px]">
-          <CandidateRangeSlider
-            key={focusedOfficeCode}
-            bounds={officeBounds}
-            value={currentRange}
-            candidateSpends={officeSpends}
-            onCommit={(range) =>
-              setActiveRange({ office: focusedOfficeCode, range })
-            }
-          />
+        <div className="flex justify-center w-full mt-3">
+          <div className="w-[45%] max-w-65">
+            <CandidateRangeSlider
+              key={focusedOfficeCode}
+              bounds={officeBounds}
+              value={currentRange}
+              candidateSpends={officeSpends}
+              onCommit={(range) =>
+                setActiveRange({ office: focusedOfficeCode, range })
+              }
+            />
+          </div>
         </div>
       )}
     </div>
