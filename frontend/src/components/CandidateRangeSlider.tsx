@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { DollarRange } from "@/utils/transformToHierarchy";
 import {
   formatDollars,
@@ -24,6 +24,62 @@ export function clampMax(v: number, min: number, rangeMax: number): number {
   return Math.max(Math.min(v, rangeMax), min + 1);
 }
 
+export const DEFAULT_MAX_VISIBLE_CANDIDATES = 200;
+
+/** Count of values >= v in a descending-sorted array, via binary search. */
+function countAtLeast(sortedDesc: number[], v: number): number {
+  let lo = 0;
+  let hi = sortedDesc.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDesc[mid] >= v) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Count of values > v in a descending-sorted array, via binary search. */
+function countMoreThan(sortedDesc: number[], v: number): number {
+  let lo = 0;
+  let hi = sortedDesc.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDesc[mid] > v) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * If `range` currently spans more than `maxCandidates` values, pulls the
+ * handle opposite `drivingHandle` in until it doesn't — e.g. dragging min
+ * down toward $0 past the cap pulls max down with it, live, rather than
+ * letting the candidate count balloon.
+ */
+export function clampRangeToMaxCandidates(
+  range: DollarRange,
+  drivingHandle: "min" | "max",
+  sortedDescSpends: number[],
+  maxCandidates: number = DEFAULT_MAX_VISIBLE_CANDIDATES,
+): DollarRange {
+  const p = countAtLeast(sortedDescSpends, range.min);
+  const s = countMoreThan(sortedDescSpends, range.max);
+  const count = Math.max(0, p - s);
+  if (count <= maxCandidates) return range;
+
+  if (drivingHandle === "min") {
+    const targetIndex = p - maxCandidates;
+    const newMax = sortedDescSpends[targetIndex];
+    if (newMax === undefined) return range;
+    return { min: range.min, max: Math.max(newMax, range.min + 1) };
+  }
+
+  const targetIndex = s + maxCandidates - 1;
+  const newMin = sortedDescSpends[targetIndex];
+  if (newMin === undefined) return range;
+  return { min: Math.min(newMin, range.max - 1), max: range.max };
+}
+
 interface CandidateRangeSliderProps {
   /** Absolute min/max total_spending for this office — the slider's fixed track bounds. */
   bounds: DollarRange;
@@ -31,6 +87,8 @@ interface CandidateRangeSliderProps {
   value: DollarRange;
   /** Every positive total_spending value for this office, used to compute the live count. */
   candidateSpends: number[];
+  /** Caps how many candidates can ever be in range at once; the handle opposite whichever one is moving gets pulled in to enforce it. */
+  maxCandidates?: number;
   /** Fires on drag-release, discrete keyboard steps, and valid/snapped input-box commits — never on every drag tick. */
   onCommit: (range: DollarRange) => void;
 }
@@ -39,6 +97,7 @@ export default function CandidateRangeSlider({
   bounds,
   value,
   candidateSpends,
+  maxCandidates = DEFAULT_MAX_VISIBLE_CANDIDATES,
   onCommit,
 }: CandidateRangeSliderProps) {
   const [live, setLive] = useState<DollarRange>(value);
@@ -48,6 +107,20 @@ export default function CandidateRangeSlider({
 
   const [minText, setMinText] = useState(formatDollarsFull(value.min));
   const [maxText, setMaxText] = useState(formatDollarsFull(value.max));
+
+  const sortedDescSpends = useMemo(
+    () => [...candidateSpends].sort((a, b) => b - a),
+    [candidateSpends],
+  );
+
+  function clampToCap(range: DollarRange, drivingHandle: "min" | "max") {
+    return clampRangeToMaxCandidates(
+      range,
+      drivingHandle,
+      sortedDescSpends,
+      maxCandidates,
+    );
+  }
 
   const span = Math.max(1, bounds.max - bounds.min);
 
@@ -88,7 +161,7 @@ export default function CandidateRangeSlider({
       handle === "min"
         ? { min: Math.min(raw, current.max - 1), max: current.max }
         : { min: current.min, max: Math.max(raw, current.min + 1) };
-    setLiveRange(next);
+    setLiveRange(clampToCap(next, handle));
   }
 
   function onHandlePointerUp() {
@@ -106,7 +179,7 @@ export default function CandidateRangeSlider({
       if (!delta) return;
       e.preventDefault();
       const current = liveRef.current;
-      const next: DollarRange =
+      const raw: DollarRange =
         handle === "min"
           ? {
               min: clampMin(current.min + delta, current.max, bounds.min),
@@ -116,6 +189,7 @@ export default function CandidateRangeSlider({
               min: current.min,
               max: clampMax(current.max + delta, current.min, bounds.max),
             };
+      const next = clampToCap(raw, handle);
       setLiveRange(next);
       onCommit(next);
     };
@@ -129,9 +203,13 @@ export default function CandidateRangeSlider({
       parsed !== null &&
       isValidMin(parsed, liveRef.current.max, bounds.min)
     ) {
-      const next = { min: parsed, max: liveRef.current.max };
+      const previousMax = liveRef.current.max;
+      const next = clampToCap({ min: parsed, max: previousMax }, "min");
       liveRef.current = next;
       setLive(next);
+      if (next.max !== previousMax) {
+        setMaxText(formatDollarsFull(next.max));
+      }
       onCommit(next);
     }
   }
@@ -142,7 +220,10 @@ export default function CandidateRangeSlider({
       parsed === null
         ? liveRef.current.min
         : clampMin(parsed, liveRef.current.max, bounds.min);
-    const next = { min: snapped, max: liveRef.current.max };
+    const next = clampToCap(
+      { min: snapped, max: liveRef.current.max },
+      "min",
+    );
     setLiveRange(next);
     onCommit(next);
   }
@@ -155,9 +236,13 @@ export default function CandidateRangeSlider({
       parsed !== null &&
       isValidMax(parsed, liveRef.current.min, bounds.max)
     ) {
-      const next = { min: liveRef.current.min, max: parsed };
+      const previousMin = liveRef.current.min;
+      const next = clampToCap({ min: previousMin, max: parsed }, "max");
       liveRef.current = next;
       setLive(next);
+      if (next.min !== previousMin) {
+        setMinText(formatDollarsFull(next.min));
+      }
       onCommit(next);
     }
   }
@@ -168,7 +253,10 @@ export default function CandidateRangeSlider({
       parsed === null
         ? liveRef.current.max
         : clampMax(parsed, liveRef.current.min, bounds.max);
-    const next = { min: liveRef.current.min, max: snapped };
+    const next = clampToCap(
+      { min: liveRef.current.min, max: snapped },
+      "max",
+    );
     setLiveRange(next);
     onCommit(next);
   }
