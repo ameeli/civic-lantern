@@ -165,10 +165,15 @@ test.describe("Candidate spending pack chart: dollar-range slider", () => {
     // Zoom back out to root and compare the office bubble's radius.
     await page.getByRole("navigation").getByText("All Races", { exact: true }).click();
     await expect(page.locator("circle.fill-office-senate")).toBeVisible();
-    const radiusAfter = await page
-      .locator("circle.fill-office-senate")
-      .getAttribute("r");
 
-    expect(Number(radiusAfter)).toBeCloseTo(Number(radiusBefore), 1);
+    // The zoom-out animates for 750ms before the range resets and the chart
+    // rebuilds, so poll until the radius settles rather than sampling mid-tween.
+    await expect
+      .poll(async () =>
+        Number(
+          await page.locator("circle.fill-office-senate").getAttribute("r"),
+        ),
+      )
+      .toBeCloseTo(Number(radiusBefore), 1);
   });
 });
