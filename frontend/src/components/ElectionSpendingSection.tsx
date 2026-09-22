@@ -75,7 +75,7 @@ function SpendingCategory({
 export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
   return (
     <div className="col-span-12 sm:col-span-12 lg:col-span-4 space-y-3 pr-4">
-      <div className="space-y-5">
+      <div className="space-y-7">
         <SpendingCategory
           total={<InsideDisbursements cycle={cycle} />}
           heading="Direct Campaign Spending"
