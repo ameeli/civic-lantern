@@ -8,14 +8,6 @@ import {
   parseDollarInput,
 } from "@/utils/formatDollars";
 
-export function isValidMin(v: number, max: number, rangeMin: number): boolean {
-  return v >= rangeMin && v < max;
-}
-
-export function isValidMax(v: number, min: number, rangeMax: number): boolean {
-  return v > min && v <= rangeMax;
-}
-
 export function clampMin(v: number, max: number, rangeMin: number): number {
   return Math.min(Math.max(v, rangeMin), max - 1);
 }
@@ -89,7 +81,7 @@ interface CandidateRangeSliderProps {
   candidateSpends: number[];
   /** Caps how many candidates can ever be in range at once; the handle opposite whichever one is moving gets pulled in to enforce it. */
   maxCandidates?: number;
-  /** Fires on drag-release, discrete keyboard steps, and valid/snapped input-box commits — never on every drag tick. */
+  /** Fires on drag-release, discrete keyboard steps, and input-box blur/Enter commits — never on every drag tick. */
   onCommit: (range: DollarRange) => void;
 }
 
@@ -195,25 +187,6 @@ export default function CandidateRangeSlider({
     };
   }
 
-  function handleMinChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const text = e.target.value;
-    setMinText(text);
-    const parsed = parseDollarInput(text);
-    if (
-      parsed !== null &&
-      isValidMin(parsed, liveRef.current.max, bounds.min)
-    ) {
-      const previousMax = liveRef.current.max;
-      const next = clampToCap({ min: parsed, max: previousMax }, "min");
-      liveRef.current = next;
-      setLive(next);
-      if (next.max !== previousMax) {
-        setMaxText(formatDollarsFull(next.max));
-      }
-      onCommit(next);
-    }
-  }
-
   function handleMinBlur() {
     const parsed = parseDollarInput(minText);
     const snapped =
@@ -226,25 +199,6 @@ export default function CandidateRangeSlider({
     );
     setLiveRange(next);
     onCommit(next);
-  }
-
-  function handleMaxChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const text = e.target.value;
-    setMaxText(text);
-    const parsed = parseDollarInput(text);
-    if (
-      parsed !== null &&
-      isValidMax(parsed, liveRef.current.min, bounds.max)
-    ) {
-      const previousMin = liveRef.current.min;
-      const next = clampToCap({ min: previousMin, max: parsed }, "max");
-      liveRef.current = next;
-      setLive(next);
-      if (next.min !== previousMin) {
-        setMinText(formatDollarsFull(next.min));
-      }
-      onCommit(next);
-    }
   }
 
   function handleMaxBlur() {
@@ -319,26 +273,20 @@ export default function CandidateRangeSlider({
         <input
           aria-label="Minimum total spending amount"
           value={minText}
-          onChange={handleMinChange}
+          onChange={(e) => setMinText(e.target.value)}
           onBlur={handleMinBlur}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleMinBlur();
-              e.currentTarget.blur();
-            }
+            if (e.key === "Enter") e.currentTarget.blur();
           }}
           className="border-ink-thin bg-transparent px-2 py-1 text-xs w-1/2 text-center"
         />
         <input
           aria-label="Maximum total spending amount"
           value={maxText}
-          onChange={handleMaxChange}
+          onChange={(e) => setMaxText(e.target.value)}
           onBlur={handleMaxBlur}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleMaxBlur();
-              e.currentTarget.blur();
-            }
+            if (e.key === "Enter") e.currentTarget.blur();
           }}
           className="border-ink-thin bg-transparent px-2 py-1 text-xs w-1/2 text-center"
         />

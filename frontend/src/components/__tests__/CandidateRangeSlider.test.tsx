@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 import CandidateRangeSlider, {
-  isValidMin,
-  isValidMax,
   clampMin,
   clampMax,
   clampRangeToMaxCandidates,
@@ -107,7 +105,7 @@ describe("CandidateRangeSlider", () => {
     expect(onCommit).toHaveBeenCalledWith({ min: 300, max: 800 });
   });
 
-  it("commits immediately per keystroke when the typed value is valid", () => {
+  it("commits a typed value on blur, not per keystroke", () => {
     const onCommit = vi.fn();
     const { getByLabelText } = render(
       <CandidateRangeSlider
@@ -119,7 +117,40 @@ describe("CandidateRangeSlider", () => {
     );
     const minInput = getByLabelText("Minimum total spending amount");
     fireEvent.change(minInput, { target: { value: "300" } });
+    expect(onCommit).not.toHaveBeenCalled();
+
+    fireEvent.blur(minInput);
+    expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith({ min: 300, max: 800 });
+  });
+
+  it("does not let intermediate keystrokes apply the candidate cap to the other handle", () => {
+    const manySpends = Array.from({ length: 300 }, (_, i) => i + 1); // 1..300
+    const onCommit = vi.fn();
+    const { getByLabelText } = render(
+      <CandidateRangeSlider
+        bounds={{ min: 0, max: 300 }}
+        value={{ min: 250, max: 300 }}
+        candidateSpends={manySpends}
+        onCommit={onCommit}
+      />,
+    );
+    const minInput = getByLabelText("Minimum total spending amount");
+    const maxInput = getByLabelText(
+      "Maximum total spending amount",
+    ) as HTMLInputElement;
+
+    for (const text of ["1", "10", "100"]) {
+      fireEvent.change(minInput, { target: { value: text } });
+    }
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(maxInput.value).toBe("$300");
+
+    fireEvent.blur(minInput);
+    // [100, 300] holds 201 candidates, so max is pulled in by exactly one.
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith({ min: 100, max: 299 });
+    expect(maxInput.value).toBe("$299");
   });
 
   it("does not commit an invalid typed value until blur, then snaps to the nearest boundary", () => {
@@ -158,8 +189,10 @@ describe("CandidateRangeSlider", () => {
       "Maximum total spending amount",
     ) as HTMLInputElement;
 
+    maxInput.focus();
     fireEvent.change(maxInput, { target: { value: "1500" } }); // invalid: exceeds bounds.max
     fireEvent.keyDown(maxInput, { key: "Enter" });
+    expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onCommit).toHaveBeenCalledWith({ min: 200, max: 1000 });
   });
 
@@ -216,15 +249,6 @@ describe("CandidateRangeSlider", () => {
 });
 
 describe("slider validation helpers", () => {
-  it("isValidMin/isValidMax enforce strict ordering within bounds", () => {
-    expect(isValidMin(50, 100, 0)).toBe(true);
-    expect(isValidMin(-1, 100, 0)).toBe(false);
-    expect(isValidMin(100, 100, 0)).toBe(false);
-    expect(isValidMax(150, 100, 200)).toBe(true);
-    expect(isValidMax(100, 100, 200)).toBe(false);
-    expect(isValidMax(300, 100, 200)).toBe(false);
-  });
-
   it("clampMin/clampMax snap to the nearest violated boundary", () => {
     expect(clampMin(-5, 100, 0)).toBe(0);
     expect(clampMin(150, 100, 0)).toBe(99);

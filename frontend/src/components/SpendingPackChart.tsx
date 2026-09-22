@@ -186,6 +186,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       : ["root"];
 
     const svg = d3.select(svgRef.current);
+    svg.interrupt("chart-zoom");
     svg.selectAll("*").remove();
 
     const root = d3
@@ -375,8 +376,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       // Only clear a customized range when navigating away from its office
       // (including via root) — never eagerly set one on entry, since
       // transformToHierarchy already falls back to the per-office default
-      // when activeRange is null. This keeps ordinary navigation from
-      // recomputing the hierarchy (and interrupting the zoom transition).
+      // when activeRange is null. Clearing recomputes the hierarchy and
+      // rebuilds the chart, so it's deferred until the zoom transition ends.
       const targetOffice =
         target.depth === 0
           ? undefined
@@ -385,9 +386,10 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
                 | RaceNode
                 | undefined
             )?.code;
-      setActiveRange((prev) =>
-        prev && prev.office === targetOffice ? prev : null,
-      );
+      const clearRangeIfLeavingOffice = () =>
+        setActiveRange((prev) =>
+          prev && prev.office === targetOffice ? prev : null,
+        );
 
       const targetView: [number, number, number] = [
         target.x,
@@ -397,6 +399,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
 
       if (opts.animate === false) {
         setView(targetView);
+        clearRangeIfLeavingOffice();
         return;
       }
 
@@ -408,7 +411,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         .tween("zoom", () => {
           const i = d3.interpolate(from, targetView);
           return (t: number) => setView(i(t) as [number, number, number]);
-        });
+        })
+        .on("end", clearRangeIfLeavingOffice);
     }
 
     zoomFnRef.current = zoomTo;
