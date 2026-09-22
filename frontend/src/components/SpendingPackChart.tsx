@@ -471,11 +471,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       className="relative top-2 w-full mx-auto"
       style={{ maxWidth: "800px" }}
     >
-      <ChartBreadcrumb
-        path={breadcrumbPath}
-        onNavigate={handleNavigate}
-        align={showSlider ? "left" : "center"}
-      />
+      <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
       <div
         ref={containerRef}
         className="w-[88%] mx-auto"
@@ -484,7 +480,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         <svg ref={svgRef} width={width} height={height} />
       </div>
       {showSlider && focusedOfficeCode && officeBounds && currentRange && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-[88%] flex justify-center z-10 lg:top-3 lg:bottom-auto lg:left-auto lg:right-3 lg:translate-x-0 lg:w-[45%] lg:max-w-[260px] lg:justify-end">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex justify-center w-[45%] max-w-[260px]">
           <CandidateRangeSlider
             key={focusedOfficeCode}
             bounds={officeBounds}
