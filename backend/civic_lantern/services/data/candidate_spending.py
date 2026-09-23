@@ -4,6 +4,7 @@ from sqlalchemy import asc, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
+from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.db.models.mv_candidate_spending_summary import (
     MvCandidateSpendingSummary,
 )
@@ -11,13 +12,27 @@ from civic_lantern.schemas.candidate_spending import SpendingSortBy
 from civic_lantern.services.data.base import BaseService
 
 
+def _total_spending_expr() -> Any:
+    return (
+        MvCandidateSpendingSummary.inside_disbursements
+        + MvCandidateSpendingSummary.outside_support
+        + MvCandidateSpendingSummary.outside_oppose
+    )
+
+
 class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
     def __init__(self, db: AsyncSession) -> None:
         super().__init__(model=MvCandidateSpendingSummary, db=db)
         self.index_elements = ["candidate_id", "cycle"]
 
-    def _build_base_query(self) -> Any:
-        return select(MvCandidateSpendingSummary)
+    def _build_base_query(self, office: Optional[OfficeTypeEnum] = None) -> Any:
+        stmt = select(MvCandidateSpendingSummary)
+        if office is not None:
+            stmt = stmt.join(
+                Candidate,
+                Candidate.candidate_id == MvCandidateSpendingSummary.candidate_id,
+            ).where(Candidate.office == office)
+        return stmt
 
     def _apply_sorting(
         self,
@@ -31,9 +46,7 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
             "inside_disbursements": MvCandidateSpendingSummary.inside_disbursements,
             "outside_support": MvCandidateSpendingSummary.outside_support,
             "outside_oppose": MvCandidateSpendingSummary.outside_oppose,
-            "total_spending": MvCandidateSpendingSummary.inside_disbursements
-            + MvCandidateSpendingSummary.outside_support
-            + MvCandidateSpendingSummary.outside_oppose,
+            "total_spending": _total_spending_expr(),
             "influence_ratio": MvCandidateSpendingSummary.influence_ratio,
             "vulnerability_factor": MvCandidateSpendingSummary.vulnerability_factor,
         }
@@ -69,9 +82,11 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
         sort_by: SpendingSortBy = "total_spending",
         order: Literal["asc", "desc"] = "desc",
         cycle: Optional[int] = None,
+        office: Optional[OfficeTypeEnum] = None,
     ) -> dict[str, Any]:
-        base_stmt = self._build_base_query()
+        base_stmt = self._build_base_query(office=office)
         base_stmt = self._apply_filters(base_stmt, cycle=cycle)
+        base_stmt = base_stmt.where(_total_spending_expr() > 0)
         sorted_stmt = self._apply_sorting(base_stmt, sort_by, order)
 
         result = await self._paginate(base_stmt, sorted_stmt, limit, offset)

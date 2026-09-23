@@ -39,10 +39,12 @@ function IndependentExpenditureTypes() {
       </h3>
       <p className="text-body-justify">
         <strong className="font-bold">Independent Support: </strong>
-        Promotes the candidate's record or platform to build voter approval.
+        Promotes the candidate&apos;s record or platform to build voter
+        approval.
         <br />
         <strong className="font-bold">Independent Opposition: </strong>
-        Attacks the candidate's character or positions to discourage support.
+        Attacks the candidate&apos;s character or positions to discourage
+        support.
       </p>
     </section>
   );
@@ -72,8 +74,8 @@ function SpendingCategory({
 
 export default function ElectionSpendingSection({ cycle }: { cycle: number }) {
   return (
-    <div className="col-span-12 sm:col-span-12 lg:col-span-4 space-y-3 px-2">
-      <div className="space-y-3">
+    <div className="col-span-12 sm:col-span-12 lg:col-span-4 space-y-3 pr-4">
+      <div className="space-y-7">
         <SpendingCategory
           total={<InsideDisbursements cycle={cycle} />}
           heading="Direct Campaign Spending"

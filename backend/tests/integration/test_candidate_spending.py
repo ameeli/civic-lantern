@@ -1,4 +1,4 @@
-"""Integration tests for CandidateSpendingService using mv_candidate_spending_summary."""
+"""Integration tests for CandidateSpendingService via mv_candidate_spending_summary."""
 
 from decimal import Decimal
 
@@ -11,6 +11,7 @@ from sqlalchemy.pool import NullPool
 from civic_lantern.core.config import get_settings
 from civic_lantern.db.models import Base
 from civic_lantern.db.models.candidate import Candidate
+from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
@@ -28,8 +29,10 @@ MV_SQL = """
     ),
     outside AS (
         SELECT candidate_id, cycle,
-            SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END) AS outside_support,
-            SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END) AS outside_oppose
+            SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END)
+                AS outside_support,
+            SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END)
+                AS outside_oppose
         FROM schedule_e_totals_by_candidate
         GROUP BY candidate_id, cycle
     ),
@@ -259,7 +262,7 @@ class TestGetList:
         assert [r.cycle for r in result["items"]] == [2020, 2022, 2024]
 
     async def test_sort_by_total_spending_desc(self, db_with_mv):
-        """total_spending is a computed sort column (disbursements + support + oppose)."""
+        """total_spending is computed: disbursements + support + oppose."""
         await _seed_and_refresh(
             db_with_mv,
             candidates=[
@@ -358,6 +361,139 @@ class TestGetList:
 
         assert result_desc["total_count"] == 2
         assert result_asc["total_count"] == 2
+
+    async def test_office_filter_returns_only_matching_office(self, db_with_mv):
+        await _seed_and_refresh(
+            db_with_mv,
+            candidates=[
+                Candidate(
+                    candidate_id="C001", name="Alice", office=OfficeTypeEnum.HOUSE
+                ),
+                Candidate(
+                    candidate_id="C002", name="Bob", office=OfficeTypeEnum.SENATE
+                ),
+            ],
+            inside_rows=[
+                InsideTotalsByCandidate(
+                    candidate_id="C001", cycle=2024, disbursements=Decimal("10000.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C002", cycle=2024, disbursements=Decimal("20000.00")
+                ),
+            ],
+        )
+
+        service = CandidateSpendingService(db=db_with_mv)
+        result = await service.get_list(office=OfficeTypeEnum.HOUSE)
+
+        assert result["total_count"] == 1
+        assert [r.candidate_id for r in result["items"]] == ["C001"]
+
+    async def test_office_filter_with_pagination(self, db_with_mv):
+        """Regression: office filtering must happen before LIMIT/OFFSET.
+
+        If office were filtered post-pagination, a page could come back
+        under-filled even though more matching rows exist.
+        """
+        house_candidates = [
+            Candidate(
+                candidate_id=f"H{i:03d}", name=f"House {i}", office=OfficeTypeEnum.HOUSE
+            )
+            for i in range(3)
+        ]
+        senate_candidates = [
+            Candidate(
+                candidate_id=f"S{i:03d}",
+                name=f"Senate {i}",
+                office=OfficeTypeEnum.SENATE,
+            )
+            for i in range(2)
+        ]
+        inside_rows = [
+            InsideTotalsByCandidate(
+                candidate_id=c.candidate_id,
+                cycle=2024,
+                disbursements=Decimal("10000.00"),
+            )
+            for c in [*house_candidates, *senate_candidates]
+        ]
+        await _seed_and_refresh(
+            db_with_mv, [*house_candidates, *senate_candidates], inside_rows=inside_rows
+        )
+
+        service = CandidateSpendingService(db=db_with_mv)
+        page1 = await service.get_list(office=OfficeTypeEnum.HOUSE, limit=2, offset=0)
+
+        assert page1["total_count"] == 3
+        assert len(page1["items"]) == 2
+        assert all(r.candidate_id.startswith("H") for r in page1["items"])
+
+        page2 = await service.get_list(office=OfficeTypeEnum.HOUSE, limit=2, offset=2)
+
+        assert len(page2["items"]) == 1
+        assert page2["items"][0].candidate_id.startswith("H")
+
+    async def test_office_filter_none_is_backward_compatible(
+        self, db_with_mv, standard_seed_data
+    ):
+        service = CandidateSpendingService(db=db_with_mv)
+        result = await service.get_list()
+
+        assert result["total_count"] == 2
+
+    async def test_total_spending_zero_excluded(self, db_with_mv):
+        await _seed_and_refresh(
+            db_with_mv,
+            candidates=[
+                Candidate(candidate_id="C001", name="Alice"),
+                Candidate(candidate_id="C002", name="Bob"),
+            ],
+            inside_rows=[
+                InsideTotalsByCandidate(
+                    candidate_id="C001", cycle=2024, disbursements=Decimal("0.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C002", cycle=2024, disbursements=Decimal("10000.00")
+                ),
+            ],
+        )
+
+        service = CandidateSpendingService(db=db_with_mv)
+        result = await service.get_list()
+
+        assert result["total_count"] == 1
+        assert [r.candidate_id for r in result["items"]] == ["C002"]
+
+    async def test_office_and_total_spending_filters_combined(self, db_with_mv):
+        await _seed_and_refresh(
+            db_with_mv,
+            candidates=[
+                Candidate(
+                    candidate_id="C001", name="Alice", office=OfficeTypeEnum.HOUSE
+                ),
+                Candidate(candidate_id="C002", name="Bob", office=OfficeTypeEnum.HOUSE),
+                Candidate(
+                    candidate_id="C003", name="Carol", office=OfficeTypeEnum.SENATE
+                ),
+            ],
+            inside_rows=[
+                InsideTotalsByCandidate(
+                    candidate_id="C001", cycle=2024, disbursements=Decimal("0.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C002", cycle=2024, disbursements=Decimal("5000.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C003", cycle=2024, disbursements=Decimal("5000.00")
+                ),
+            ],
+        )
+
+        service = CandidateSpendingService(db=db_with_mv)
+        result = await service.get_list(office=OfficeTypeEnum.HOUSE)
+
+        assert result["total_count"] == 1
+        assert [r.candidate_id for r in result["items"]] == ["C002"]
 
 
 @pytest.mark.integration

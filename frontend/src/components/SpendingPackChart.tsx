@@ -5,22 +5,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useChartDimensions } from "@/hooks/useChartDimensions";
 import {
   transformToHierarchy,
+  getPositiveSortedSpenders,
+  getOfficeBounds,
+  getDefaultRange,
   type HierarchyRoot,
   type RaceNode,
   type CandidateNode,
   type SpendingLeaf,
+  type CandidatesByOffice,
+  type DollarRange,
 } from "@/utils/transformToHierarchy";
+import { formatDollars } from "@/utils/formatDollars";
 import ChartBreadcrumb from "./ChartBreadcrumb";
-import type { CandidateSpending } from "@/types/spending";
-
-const MAX_NAMED_CANDIDATES_PER_OFFICE = 30;
-
-function formatDollars(v: number): string {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
-  return `$${Math.round(v)}`;
-}
+import CandidateRangeSlider from "./CandidateRangeSlider";
+import type { OfficeCode } from "@/types/spending";
 
 function partyClass(party: string | null): string {
   if (party === "DEM" || party === "DFL") return "fill-party-dem";
@@ -52,16 +50,22 @@ function spendingLabel(name: string): string {
 type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
 type PackNode = d3.HierarchyCircularNode<SpendingNode>;
 
-function isOthersNode(d: { data: SpendingNode }): boolean {
-  return "cutoff" in d.data && d.data.cutoff !== undefined;
-}
-
-// Bypasse d3's HierarchyNode.value read only restriction for value-damping mutation.
+// Bypasses d3's HierarchyNode.value read-only restriction so office nodes can
+// display their true total spending, independent of the pack-sizing pass.
 function setNodeValue(
   node: d3.HierarchyNode<SpendingNode>,
   value: number | undefined,
 ): void {
   (node as { value?: number }).value = value;
+}
+
+/** A minimal leaf-only hierarchy used purely to size each office bubble by its
+ * true total spending, decoupled from how many candidates are currently visible. */
+interface OfficeSizeDatum {
+  name: string;
+  code: OfficeCode;
+  value: number;
+  children?: OfficeSizeDatum[];
 }
 
 function wrapWords(
@@ -100,11 +104,7 @@ function wrapLabel(
     const maxWidth = d.r * 1.6;
 
     const displayName =
-      d.depth === 3
-        ? spendingLabel(d.data.name)
-        : "cutoff" in d.data && d.data.cutoff !== undefined
-          ? `Less than ${formatDollars(d.data.cutoff)}`
-          : d.data.name;
+      d.depth === 3 ? spendingLabel(d.data.name) : d.data.name;
     const nameLines = wrapWords(
       el,
       displayName.split(/\s+/).filter(Boolean),
@@ -145,7 +145,7 @@ function wrapLabel(
 }
 
 interface SpendingPackChartProps {
-  data: CandidateSpending[];
+  data: CandidatesByOffice;
 }
 
 export default function SpendingPackChart({ data }: SpendingPackChartProps) {
@@ -153,25 +153,40 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   const [breadcrumbPath, setBreadcrumbPath] = useState<string[]>(["All Races"]);
+  const [activeRange, setActiveRange] = useState<{
+    office: OfficeCode;
+    range: DollarRange;
+  } | null>(null);
+  const [focusDepth, setFocusDepth] = useState(0);
 
   // Refs let handleNavigate reach into the live D3 state
   const packRootRef = useRef<PackNode | null>(null);
   const focusRef = useRef<PackNode | null>(null);
-  const zoomFnRef = useRef<((target: PackNode) => void) | null>(null);
+  const zoomFnRef = useRef<
+    ((target: PackNode, opts?: { animate?: boolean }) => void) | null
+  >(null);
 
   const { width, height } = useChartDimensions(containerRef);
 
   const hierarchy = useMemo(
-    () => transformToHierarchy(data, MAX_NAMED_CANDIDATES_PER_OFFICE),
-    [data],
+    () => transformToHierarchy(data, activeRange ?? undefined),
+    [data, activeRange],
   );
 
   useEffect(() => {
     if (!width || !height || !svgRef.current) return;
 
-    setBreadcrumbPath(["All Races"]);
+    // Capture the user's current focus path before tearing down, so it can be
+    // reapplied after rebuilding (rather than always snapping back to root).
+    const priorPath = focusRef.current
+      ? focusRef.current
+          .ancestors()
+          .reverse()
+          .map((n) => n.data.name)
+      : ["root"];
 
     const svg = d3.select(svgRef.current);
+    svg.interrupt("chart-zoom");
     svg.selectAll("*").remove();
 
     const root = d3
@@ -179,43 +194,84 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .sum((d) => ("value" in d ? d.value : 0))
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
-    // Cap "Less than" node's contribution to the pack's SIZING calculation at the
-    // combined value of its office's named candidates, so it never claims more than
-    // roughly half of the total area.
-    const trueValues = new Map<d3.HierarchyNode<SpendingNode>, number>();
-    root.each((d) => trueValues.set(d, d.value ?? 0));
-
-    root.each((d) => {
-      if (!isOthersNode(d)) return;
-      const siblings = d.parent?.children ?? [];
-      const candidatesSum = siblings
-        .filter((s) => s !== d)
-        .reduce((sum, s) => sum + (trueValues.get(s) ?? 0), 0);
-      const trueValue = trueValues.get(d) ?? 0;
-      const cappedValue = Math.min(trueValue, candidatesSum);
-      const delta = trueValue - cappedValue;
-      if (delta <= 0) return;
-      let cur: d3.HierarchyNode<SpendingNode> | null = d;
-      while (cur) {
-        setNodeValue(cur, (cur.value ?? 0) - delta);
-        cur = cur.parent;
-      }
-    });
+    // Phase 1: size each office bubble purely by its true total spending, as
+    // if it were a single leaf — this decouples the bubble's size from how
+    // many candidates the slider currently shows (and from d3-pack's non-leaf
+    // sizing, which depends on the number/distribution of packed children,
+    // not just their sum).
+    const sizingRoot = d3
+      .hierarchy<OfficeSizeDatum>({
+        name: "root",
+        code: "P",
+        value: 0,
+        children: (hierarchy.children as RaceNode[]).map((r) => ({
+          name: r.name,
+          code: r.code,
+          value: r.trueTotal,
+        })),
+      })
+      .sum((d) => d.value)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     d3
-      .pack<SpendingNode>()
+      .pack<OfficeSizeDatum>()
       .size([width, height] as [number, number])
-      .padding(3)(root);
-
-    // Restore true values for accurate display text — radii/positions are
-    // already computed and unaffected by this.
-    root.each((d) => {
-      setNodeValue(d, trueValues.get(d));
-    });
+      .padding(3)(sizingRoot);
+    const sizedOffices =
+      sizingRoot as d3.HierarchyCircularNode<OfficeSizeDatum>;
 
     const packRoot = root as PackNode;
+    packRoot.x = sizedOffices.x;
+    packRoot.y = sizedOffices.y;
+    packRoot.r = sizedOffices.r;
+
+    // Phase 2: for each office, pack only its currently visible candidates
+    // into the circle Phase 1 just gave it, so the reclaimed space (from
+    // candidates outside the slider's range) fills with real candidates
+    // instead of being left empty.
+    packRoot.children?.forEach((officeNodeRaw) => {
+      const officeNode = officeNodeRaw as PackNode;
+      const officeData = officeNode.data as RaceNode;
+      const sized = sizedOffices.children?.find(
+        (c) => c.data.code === officeData.code,
+      );
+      if (!sized) return;
+
+      officeNode.x = sized.x;
+      officeNode.y = sized.y;
+      officeNode.r = sized.r;
+      setNodeValue(officeNode, officeData.trueTotal); // display value only
+
+      if (!officeNode.children || officeNode.children.length === 0) return;
+
+      const subRoot = d3
+        .hierarchy<SpendingNode>(officeData)
+        .sum((d) => ("value" in d ? d.value : 0))
+        .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+      const diameter = officeNode.r * 2;
+      d3.pack<SpendingNode>().size([diameter, diameter]).padding(3)(subRoot);
+      const packedSub = subRoot as PackNode;
+
+      const dx = officeNode.x - packedSub.x;
+      const dy = officeNode.y - packedSub.y;
+
+      const byData = new Map<SpendingNode, PackNode>();
+      officeNode
+        .descendants()
+        .forEach((d) => byData.set(d.data, d as PackNode));
+
+      packedSub.descendants().forEach((d) => {
+        if (d === packedSub) return; // office node itself — already positioned above
+        const target = byData.get(d.data);
+        if (!target) return;
+        target.x = d.x + dx;
+        target.y = d.y + dy;
+        target.r = d.r;
+      });
+    });
+
     packRootRef.current = packRoot;
-    focusRef.current = packRoot;
 
     let view: [number, number, number] = [
       packRoot.x,
@@ -282,21 +338,33 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         .attr("font-size", (d) => Math.max(0, Math.min(d.r * k * 0.25, 16)));
     }
 
+    function isVisibleUnder(d: PackNode, target: PackNode): boolean {
+      let cur: PackNode | null = d;
+      while (cur) {
+        if (cur === target) return true;
+        cur = cur.parent as PackNode | null;
+      }
+      return false;
+    }
+
     function updateVisibility(target: PackNode) {
       const activeDepth = target.depth + 1;
+      const isActive = (d: PackNode) =>
+        d.depth === activeDepth && isVisibleUnder(d, target);
       node
-        .attr("opacity", (d) => (d.depth === activeDepth ? 0.7 : 0))
+        .attr("opacity", (d) => (isActive(d) ? 0.7 : 0))
         .attr("pointer-events", (d) => {
-          if (d.depth !== activeDepth) return "none";
+          if (!isActive(d)) return "none";
           if (d.children) return "all";
           return "visiblePainted";
         });
-      label.attr("opacity", (d) => (d.depth === activeDepth ? 1 : 0));
+      label.attr("opacity", (d) => (isActive(d) ? 1 : 0));
     }
 
-    function zoomTo(target: PackNode) {
+    function zoomTo(target: PackNode, opts: { animate?: boolean } = {}) {
       focusRef.current = target;
       updateVisibility(target);
+      setFocusDepth(target.depth);
 
       const rawPath = target
         .ancestors()
@@ -305,13 +373,37 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const displayPath = rawPath.map((n) => (n === "root" ? "All Races" : n));
       setBreadcrumbPath(displayPath);
 
+      // Only clear a customized range when navigating away from its office
+      // (including via root) — never eagerly set one on entry, since
+      // transformToHierarchy already falls back to the per-office default
+      // when activeRange is null. Clearing recomputes the hierarchy and
+      // rebuilds the chart, so it's deferred until the zoom transition ends.
+      const targetOffice =
+        target.depth === 0
+          ? undefined
+          : (
+              target.ancestors().find((n) => n.depth === 1)?.data as
+                | RaceNode
+                | undefined
+            )?.code;
+      const clearRangeIfLeavingOffice = () =>
+        setActiveRange((prev) =>
+          prev && prev.office === targetOffice ? prev : null,
+        );
+
       const targetView: [number, number, number] = [
         target.x,
         target.y,
         target.r * 2,
       ];
-      const from = [...view] as [number, number, number];
 
+      if (opts.animate === false) {
+        setView(targetView);
+        clearRangeIfLeavingOffice();
+        return;
+      }
+
+      const from = [...view] as [number, number, number];
       d3.select(svgRef.current)
         .transition("chart-zoom")
         .duration(750)
@@ -319,13 +411,24 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
         .tween("zoom", () => {
           const i = d3.interpolate(from, targetView);
           return (t: number) => setView(i(t) as [number, number, number]);
-        });
+        })
+        .on("end", clearRangeIfLeavingOffice);
     }
 
     zoomFnRef.current = zoomTo;
-    setView(view);
-    updateVisibility(packRoot);
-  }, [hierarchy, width, height]);
+
+    // Walk the prior focus path down the freshly-built tree, falling back to
+    // the deepest ancestor that still exists (e.g. root, or the office level).
+    let matched: PackNode = packRoot;
+    for (let depth = 1; depth < priorPath.length; depth++) {
+      const next = matched.children?.find(
+        (c) => c.data.name === priorPath[depth],
+      ) as PackNode | undefined;
+      if (!next) break;
+      matched = next;
+    }
+    zoomTo(matched, { animate: false });
+  }, [hierarchy, width, height, data]);
 
   function handleNavigate(depth: number) {
     const focused = focusRef.current;
@@ -342,11 +445,44 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     if (target) zoomTo(target);
   }
 
+  const focusedOfficeCode =
+    focusDepth === 1
+      ? (focusRef.current?.data as RaceNode | undefined)?.code
+      : undefined;
+  const officeSpends = useMemo(
+    () =>
+      focusedOfficeCode
+        ? getPositiveSortedSpenders(data[focusedOfficeCode] ?? []).map(
+            (c) => c.total_spending ?? 0,
+          )
+        : [],
+    [data, focusedOfficeCode],
+  );
+  const officeBounds = useMemo(
+    () =>
+      focusedOfficeCode
+        ? getOfficeBounds(
+            getPositiveSortedSpenders(data[focusedOfficeCode] ?? []),
+          )
+        : null,
+    [data, focusedOfficeCode],
+  );
+  const currentRange = useMemo(() => {
+    if (!focusedOfficeCode) return null;
+    if (activeRange && activeRange.office === focusedOfficeCode) {
+      return activeRange.range;
+    }
+    return getDefaultRange(
+      getPositiveSortedSpenders(data[focusedOfficeCode] ?? []),
+    );
+  }, [data, focusedOfficeCode, activeRange]);
+
+  const showSlider = Boolean(
+    focusDepth === 1 && focusedOfficeCode && officeBounds && currentRange,
+  );
+
   return (
-    <div
-      className="relative top-2 w-full mx-auto"
-      style={{ maxWidth: "800px" }}
-    >
+    <div className="w-full mx-auto max-w-200 py-4">
       <ChartBreadcrumb path={breadcrumbPath} onNavigate={handleNavigate} />
       <div
         ref={containerRef}
@@ -355,6 +491,21 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       >
         <svg ref={svgRef} width={width} height={height} />
       </div>
+      {showSlider && focusedOfficeCode && officeBounds && currentRange && (
+        <div className="flex justify-center w-full mt-3">
+          <div className="w-[45%] max-w-65">
+            <CandidateRangeSlider
+              key={focusedOfficeCode}
+              bounds={officeBounds}
+              value={currentRange}
+              candidateSpends={officeSpends}
+              onCommit={(range) =>
+                setActiveRange({ office: focusedOfficeCode, range })
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

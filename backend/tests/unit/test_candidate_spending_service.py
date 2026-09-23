@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.elements import ExpressionClauseList
 
+from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.db.models.mv_candidate_spending_summary import (
     MvCandidateSpendingSummary,
 )
@@ -23,9 +24,23 @@ def base_stmt():
 
 
 @pytest.mark.unit
+class TestBuildBaseQuery:
+    def test_no_office_produces_no_join(self, service):
+        """Omitting office must leave the query identical to today (no join)."""
+        stmt = service._build_base_query()
+        assert "JOIN" not in str(stmt)
+
+    def test_office_filter_produces_join(self, service):
+        stmt = service._build_base_query(office=OfficeTypeEnum.HOUSE)
+        compiled = str(stmt)
+        assert "JOIN" in compiled
+        assert "candidates" in compiled.lower()
+
+
+@pytest.mark.unit
 class TestApplySorting:
     def test_total_spending_sorts_by_sum_expression(self, service, base_stmt):
-        """total_spending must ORDER BY disbursements+support+oppose, not any column alone."""
+        """total_spending sorts by disbursements+support+oppose, not one column."""
         sorted_stmt = service._apply_sorting(base_stmt, "total_spending", "desc")
 
         primary_sort = sorted_stmt._order_by_clauses[0]
@@ -56,7 +71,7 @@ class TestApplySorting:
         ],
     )
     def test_always_appends_two_tiebreaker_columns(self, service, base_stmt, sort_by):
-        """candidate_id and cycle tiebreakers are always the last two ORDER BY clauses."""
+        """candidate_id and cycle tiebreakers are always the last ORDER BY clauses."""
         sorted_stmt = service._apply_sorting(base_stmt, sort_by, "desc")
         assert len(sorted_stmt._order_by_clauses) == 3
 
@@ -118,7 +133,7 @@ class TestGetList:
         assert len(result["items"]) == 0
 
     async def test_makes_two_db_calls(self, service, mock_session):
-        """One execute for count, one for data. _attach_candidates short-circuits on empty."""
+        """One execute for count, one for data; _attach_candidates skips on empty."""
         mock_session.execute.side_effect = [scalar_result(0), scalars_all_result([])]
         await service.get_list()
         assert mock_session.execute.call_count == 2
@@ -128,3 +143,9 @@ class TestGetList:
         result = await service.get_list(limit=25, offset=50)
         assert result["limit"] == 25
         assert result["offset"] == 50
+
+    async def test_makes_two_db_calls_with_office_filter(self, service, mock_session):
+        """The office join must not require an extra round trip."""
+        mock_session.execute.side_effect = [scalar_result(0), scalars_all_result([])]
+        await service.get_list(office=OfficeTypeEnum.HOUSE)
+        assert mock_session.execute.call_count == 2
