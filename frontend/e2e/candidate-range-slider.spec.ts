@@ -1,19 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { formatDollars, formatDollarsFull } from "@/utils/formatDollars";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 const CYCLE = 2024;
 const OFFICE = "S";
-
-function formatDollarsFull(v: number): string {
-  return `$${Math.round(v).toLocaleString("en-US")}`;
-}
-
-function formatDollars(v: number): string {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
-  return `$${Math.round(v)}`;
-}
 
 async function fetchSenateDefaultRange() {
   const res = await fetch(

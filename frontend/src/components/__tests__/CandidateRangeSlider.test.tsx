@@ -14,6 +14,22 @@ const bounds = { min: 0, max: 1000 };
 const value = { min: 200, max: 800 };
 const candidateSpends = [50, 150, 250, 500, 750, 900];
 
+function renderSlider(overrides: {
+  bounds?: typeof bounds;
+  value?: typeof value;
+  candidateSpends?: number[];
+  onCommit?: (next: typeof value) => void;
+} = {}) {
+  return render(
+    <CandidateRangeSlider
+      bounds={overrides.bounds ?? bounds}
+      value={overrides.value ?? value}
+      candidateSpends={overrides.candidateSpends ?? candidateSpends}
+      onCommit={overrides.onCommit ?? vi.fn()}
+    />,
+  );
+}
+
 function stubTrackRect(container: HTMLElement) {
   const track = container.querySelectorAll('[role="slider"]')[0]
     .parentElement as HTMLElement;
@@ -33,27 +49,13 @@ function stubTrackRect(container: HTMLElement) {
 
 describe("CandidateRangeSlider", () => {
   it("renders static bounds labels using abbreviated formatting", () => {
-    const { getByText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={vi.fn()}
-      />,
-    );
+    const { getByText } = renderSlider();
     expect(getByText("$0")).toBeTruthy();
     expect(getByText("$1K")).toBeTruthy();
   });
 
   it("renders editable inputs using full comma formatting", () => {
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={vi.fn()}
-      />,
-    );
+    const { getByLabelText } = renderSlider();
     expect(
       (getByLabelText("Minimum total spending amount") as HTMLInputElement)
         .value,
@@ -65,28 +67,16 @@ describe("CandidateRangeSlider", () => {
   });
 
   it("shows the count of candidateSpends within the initial range", () => {
-    const { getByText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={vi.fn()}
-      />,
-    );
+    const { getByText } = renderSlider();
     // within [200, 800]: 250, 500, 750
     expect(getByText("Candidates in range: 3")).toBeTruthy();
   });
 
   it("updates live count and input during drag without committing, then commits on pointer up", () => {
     const onCommit = vi.fn();
-    const { container, getByLabelText, getByText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { container, getByLabelText, getByText } = renderSlider({
+      onCommit,
+    });
     stubTrackRect(container);
     const minHandle = getByLabelText("Minimum total spending");
 
@@ -107,14 +97,7 @@ describe("CandidateRangeSlider", () => {
 
   it("commits a typed value on blur, not per keystroke", () => {
     const onCommit = vi.fn();
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { getByLabelText } = renderSlider({ onCommit });
     const minInput = getByLabelText("Minimum total spending amount");
     fireEvent.change(minInput, { target: { value: "300" } });
     expect(onCommit).not.toHaveBeenCalled();
@@ -127,14 +110,12 @@ describe("CandidateRangeSlider", () => {
   it("does not let intermediate keystrokes apply the candidate cap to the other handle", () => {
     const manySpends = Array.from({ length: 300 }, (_, i) => i + 1); // 1..300
     const onCommit = vi.fn();
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={{ min: 0, max: 300 }}
-        value={{ min: 250, max: 300 }}
-        candidateSpends={manySpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { getByLabelText } = renderSlider({
+      bounds: { min: 0, max: 300 },
+      value: { min: 250, max: 300 },
+      candidateSpends: manySpends,
+      onCommit,
+    });
     const minInput = getByLabelText("Minimum total spending amount");
     const maxInput = getByLabelText(
       "Maximum total spending amount",
@@ -155,14 +136,7 @@ describe("CandidateRangeSlider", () => {
 
   it("does not commit an invalid typed value until blur, then snaps to the nearest boundary", () => {
     const onCommit = vi.fn();
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { getByLabelText } = renderSlider({ onCommit });
     const minInput = getByLabelText(
       "Minimum total spending amount",
     ) as HTMLInputElement;
@@ -177,14 +151,7 @@ describe("CandidateRangeSlider", () => {
 
   it("Enter key commits the same way as blur", () => {
     const onCommit = vi.fn();
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { getByLabelText } = renderSlider({ onCommit });
     const maxInput = getByLabelText(
       "Maximum total spending amount",
     ) as HTMLInputElement;
@@ -198,14 +165,7 @@ describe("CandidateRangeSlider", () => {
 
   it("steps the handle and commits immediately on arrow key press", () => {
     const onCommit = vi.fn();
-    const { getByLabelText } = render(
-      <CandidateRangeSlider
-        bounds={bounds}
-        value={value}
-        candidateSpends={candidateSpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { getByLabelText } = renderSlider({ onCommit });
     const minHandle = getByLabelText("Minimum total spending");
     fireEvent.keyDown(minHandle, { key: "ArrowRight" });
     // step = span / 100 = (1000 - 0) / 100 = 10
@@ -216,14 +176,12 @@ describe("CandidateRangeSlider", () => {
     const manySpends = Array.from({ length: 300 }, (_, i) => i + 1); // 1..300
     const wideBounds = { min: 0, max: 300 };
     const onCommit = vi.fn();
-    const { container, getByLabelText, getByText } = render(
-      <CandidateRangeSlider
-        bounds={wideBounds}
-        value={{ min: 250, max: 300 }}
-        candidateSpends={manySpends}
-        onCommit={onCommit}
-      />,
-    );
+    const { container, getByLabelText, getByText } = renderSlider({
+      bounds: wideBounds,
+      value: { min: 250, max: 300 },
+      candidateSpends: manySpends,
+      onCommit,
+    });
     stubTrackRect(container);
     const minHandle = getByLabelText("Minimum total spending");
 
