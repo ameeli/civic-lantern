@@ -8,141 +8,27 @@ import {
   getPositiveSortedSpenders,
   getOfficeBounds,
   getDefaultRange,
-  type HierarchyRoot,
   type RaceNode,
   type CandidateNode,
   type SpendingLeaf,
   type CandidatesByOffice,
   type DollarRange,
 } from "@/utils/transformToHierarchy";
-import { formatDollars } from "@/utils/formatDollars";
 import ChartBreadcrumb from "./ChartBreadcrumb";
 import CandidateRangeSlider from "./CandidateRangeSlider";
 import type { OfficeCode } from "@/types/spending";
-
-function partyClass(party: string | null): string {
-  if (party === "DEM" || party === "DFL") return "fill-party-dem";
-  if (party === "REP") return "fill-party-rep";
-  return "fill-party-neutral";
-}
-
-function officeClass(office: string): string {
-  if (office === "House") return "fill-office-house";
-  if (office === "Senate") return "fill-office-senate";
-  if (office === "Presidential") return "fill-office-president";
-  return "fill-party-neutral";
-}
-
-function spendingClass(name: string): string {
-  if (name === "Inside") return "fill-office-president";
-  if (name === "Outside Oppose") return "fill-party-rep";
-  if (name === "Outside Support") return "fill-office-house";
-  return "fill-party-neutral";
-}
-
-function spendingLabel(name: string): string {
-  if (name === "Inside") return "Direct Campaign Spending";
-  if (name === "Outside Support") return "Independent Support";
-  if (name === "Outside Oppose") return "Independent Opposition";
-  return name;
-}
-
-type SpendingNode = HierarchyRoot | RaceNode | CandidateNode | SpendingLeaf;
-type PackNode = d3.HierarchyCircularNode<SpendingNode>;
-
-// Bypasses d3's HierarchyNode.value read-only restriction so office nodes can
-// display their true total spending, independent of the pack-sizing pass.
-function setNodeValue(
-  node: d3.HierarchyNode<SpendingNode>,
-  value: number | undefined,
-): void {
-  (node as { value?: number }).value = value;
-}
-
-/** A minimal leaf-only hierarchy used purely to size each office bubble by its
- * true total spending, decoupled from how many candidates are currently visible. */
-interface OfficeSizeDatum {
-  name: string;
-  code: OfficeCode;
-  value: number;
-  children?: OfficeSizeDatum[];
-}
-
-function wrapWords(
-  el: d3.Selection<SVGTextElement, unknown, null, undefined>,
-  words: string[],
-  maxWidth: number,
-  virtualFontSize: number,
-): string[] {
-  const scratch = el.append("tspan").attr("font-size", virtualFontSize);
-  const lines: string[] = [];
-  let currentWords: string[] = [];
-  for (const word of words) {
-    const candidate = [...currentWords, word].join(" ");
-    scratch.text(candidate);
-    const width = scratch.node()?.getComputedTextLength() ?? 0;
-    if (width > maxWidth && currentWords.length > 0) {
-      lines.push(currentWords.join(" "));
-      currentWords = [word];
-    } else {
-      currentWords.push(word);
-    }
-  }
-  if (currentWords.length > 0) lines.push(currentWords.join(" "));
-  scratch.remove();
-  return lines;
-}
-
-function wrapLabel(
-  selection: d3.Selection<SVGTextElement, PackNode, SVGGElement, unknown>,
-): void {
-  selection.each(function (d) {
-    const el = d3.select(this);
-    el.text(null);
-
-    const virtualFontSize = d.r * 0.25;
-    const maxWidth = d.r * 1.6;
-
-    const displayName =
-      d.depth === 3 ? spendingLabel(d.data.name) : d.data.name;
-    const nameLines = wrapWords(
-      el,
-      displayName.split(/\s+/).filter(Boolean),
-      maxWidth,
-      virtualFontSize,
-    );
-
-    const allLines = [
-      {
-        text: formatDollars(d.value ?? 0),
-        class: "font-sans font-medium",
-        sizeEm: 1.25,
-      },
-      ...nameLines.map((text) => ({
-        text,
-        class: "font-headline font-medium font-semibold",
-        sizeEm: 1,
-      })),
-    ];
-    const lineHeight = 1.1;
-    const groupGap = 0.4;
-    const totalSpan = (allLines.length - 1) * lineHeight + groupGap;
-    const startDy = -totalSpan / 2;
-
-    allLines.forEach((line, i) => {
-      let dy = lineHeight;
-      if (i === 0) dy = startDy;
-      else if (i === 1) dy = lineHeight + groupGap;
-
-      el.append("tspan")
-        .attr("x", 0)
-        .attr("dy", `${dy}em`)
-        .attr("class", line.class)
-        .attr("font-size", `${line.sizeEm}em`)
-        .text(line.text);
-    });
-  });
-}
+import type {
+  SpendingNode,
+  PackNode,
+  OfficeSizeDatum,
+} from "./SpendingPackChart.types";
+import {
+  partyClass,
+  officeClass,
+  spendingClass,
+  setNodeValue,
+  wrapLabel,
+} from "./SpendingPackChart.utils";
 
 interface SpendingPackChartProps {
   data: CandidatesByOffice;
@@ -159,7 +45,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   } | null>(null);
   const [focusDepth, setFocusDepth] = useState(0);
 
-  // Refs let handleNavigate reach into the live D3 state
+  // Refs let handleNavigate reach into the live D3 state.
   const packRootRef = useRef<PackNode | null>(null);
   const focusRef = useRef<PackNode | null>(null);
   const zoomFnRef = useRef<
@@ -176,8 +62,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
   useEffect(() => {
     if (!width || !height || !svgRef.current) return;
 
-    // Capture the user's current focus path before tearing down, so it can be
-    // reapplied after rebuilding (rather than always snapping back to root).
+    // Capture the user's current focus path before tearing down.
     const priorPath = focusRef.current
       ? focusRef.current
           .ancestors()
@@ -194,11 +79,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       .sum((d) => ("value" in d ? d.value : 0))
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
-    // Phase 1: size each office bubble purely by its true total spending, as
-    // if it were a single leaf — this decouples the bubble's size from how
-    // many candidates the slider currently shows (and from d3-pack's non-leaf
-    // sizing, which depends on the number/distribution of packed children,
-    // not just their sum).
+    // Size each office bubble purely by its true total spending, like a single leaf.
     const sizingRoot = d3
       .hierarchy<OfficeSizeDatum>({
         name: "root",
@@ -225,10 +106,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     packRoot.y = sizedOffices.y;
     packRoot.r = sizedOffices.r;
 
-    // Phase 2: for each office, pack only its currently visible candidates
-    // into the circle Phase 1 just gave it, so the reclaimed space (from
-    // candidates outside the slider's range) fills with real candidates
-    // instead of being left empty.
+    // For each office, pack only its currently visible candidates so the reclaimed
+    // space is not left empty.
     packRoot.children?.forEach((officeNodeRaw) => {
       const officeNode = officeNodeRaw as PackNode;
       const officeData = officeNode.data as RaceNode;
@@ -373,11 +252,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
       const displayPath = rawPath.map((n) => (n === "root" ? "All Races" : n));
       setBreadcrumbPath(displayPath);
 
-      // Only clear a customized range when navigating away from its office
-      // (including via root) — never eagerly set one on entry, since
-      // transformToHierarchy already falls back to the per-office default
-      // when activeRange is null. Clearing recomputes the hierarchy and
-      // rebuilds the chart, so it's deferred until the zoom transition ends.
+      // Only clear a customized range when navigating away from its office.
       const targetOffice =
         target.depth === 0
           ? undefined
