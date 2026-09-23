@@ -37,7 +37,7 @@ src/
 ├── hooks/
 │   └── useChartDimensions.ts  # ResizeObserver-based container sizing for the chart
 ├── utils/
-│   ├── formatDollars.ts         # Dollar formatting/parsing for chart labels and slider inputs
+│   ├── formatDollars.ts         # Dollar formatting/parsing for chart labels, totals, and slider inputs
 │   └── transformToHierarchy.ts  # Per-office candidate lists + active range -> office/candidate/spending-type hierarchy for d3.pack
 └── types/
     └── spending.ts  # TypeScript types mirroring the backend's Pydantic response schemas
