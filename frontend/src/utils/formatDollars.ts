@@ -6,9 +6,13 @@ export function formatDollars(v: number): string {
   return `$${Math.round(v)}`;
 }
 
-/** Full comma-formatted dollar figure for editable inputs, e.g. $19,000,000. */
+/** Full comma-formatted whole-dollar figure for totals and editable inputs, e.g. $19,000,000 or -$5. */
 export function formatDollarsFull(v: number): string {
-  return `$${Math.round(v).toLocaleString("en-US")}`;
+  return v.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
 }
 
 /** Parses a user-typed dollar string (ignoring $, commas, etc.) into a number, or null if empty. */

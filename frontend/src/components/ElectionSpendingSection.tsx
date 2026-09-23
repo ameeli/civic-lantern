@@ -1,13 +1,9 @@
 import { Suspense } from "react";
 import { getElectionSpendingByCycle } from "@/api/spending";
+import { formatDollarsFull } from "@/utils/formatDollars";
 
 function formatDollars(value: number | null): string {
-  if (value === null) return "N/A";
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
+  return value === null ? "N/A" : formatDollarsFull(value);
 }
 
 async function InsideDisbursements({ cycle }: { cycle: number }) {
