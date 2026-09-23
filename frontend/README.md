@@ -31,8 +31,12 @@ src/
 │   ├── ElectionSpendingSection.tsx   # Inside vs. outside totals for a cycle (RSC + Suspense)
 │   ├── SpendingPackChartSection.tsx  # Fetches per-candidate spending, renders the pack chart
 │   ├── SpendingPackChart.tsx         # Client component: D3 zoomable circle pack
+│   ├── SpendingPackChart.utils.ts    # Pure D3 class/label/text-wrap helpers for the pack chart
+│   ├── SpendingPackChart.types.ts    # Pack chart node/datum types
 │   ├── CandidateRangeSlider.tsx      # Dual-handle dollar-range slider for the zoomed-in office
+│   ├── CandidateRangeSlider.utils.ts # Pure range clamping and candidate-count binary search
 │   ├── ChartBreadcrumb.tsx           # Breadcrumb nav for the pack chart drill-down
+│   ├── Masthead.tsx                  # Newspaper-style page header with the current date
 │   ├── Gavel.tsx, MastheadRule.tsx, PaperBorder.tsx  # Decorative/layout components
 ├── hooks/
 │   └── useChartDimensions.ts  # ResizeObserver-based container sizing for the chart
