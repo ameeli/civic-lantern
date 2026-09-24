@@ -73,6 +73,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npx prettier --check .
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm audit --audit-level=high
 
