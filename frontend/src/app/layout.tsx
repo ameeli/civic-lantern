@@ -1,25 +1,37 @@
 import type { Metadata } from "next";
-import { Inconsolata, Eagle_Lake, Playfair_Display } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Inconsolata({
+// Self-hosted (not next/font/google) - see src/fonts/README.md for why.
+const geistSans = localFont({
+  src: "../fonts/inconsolata-latin-wght-normal.woff2",
+  weight: "300 600",
+  style: "normal",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
 });
 
-const masthead = Eagle_Lake({
+const masthead = localFont({
+  src: "../fonts/eagle-lake-latin-400-normal.woff2",
   weight: "400",
-  subsets: ["latin"],
+  style: "normal",
   variable: "--font-masthead",
   display: "swap",
 });
 
-const headline = Playfair_Display({
+const headline = localFont({
+  src: [
+    {
+      path: "../fonts/playfair-display-latin-wght-normal.woff2",
+      weight: "400 800",
+      style: "normal",
+    },
+    {
+      path: "../fonts/playfair-display-latin-wght-italic.woff2",
+      weight: "400 800",
+      style: "italic",
+    },
+  ],
   variable: "--font-headline",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "800"],
-  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
