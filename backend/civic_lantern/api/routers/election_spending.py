@@ -1,8 +1,13 @@
+from typing import Sequence
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.api.deps import get_db
 from civic_lantern.core.cycles import current_cycle_ceiling
+from civic_lantern.db.models.mv_election_spending_summary import (
+    MvElectionSpendingSummary,
+)
 from civic_lantern.jobs.ingestors import SPENDING_INGESTOR_NAMES
 from civic_lantern.schemas.election_spending import ElectionSpending
 from civic_lantern.services.data.election_spending import ElectionSpendingService
@@ -35,8 +40,12 @@ def validate_even_cycle(cycle: int = Path(..., ge=1980)) -> int:
 @router.get("", response_model=list[ElectionSpending])
 async def get_election_spending(
     db: AsyncSession = Depends(get_db),
-) -> list[ElectionSpending]:
-    """Fetch election-level spending summaries from the materialized view."""
+) -> Sequence[MvElectionSpendingSummary]:
+    """Fetch election-level spending summaries from the materialized view.
+
+    Returns the raw view rows; response_model=list[ElectionSpending] handles
+    the actual API-facing conversion/validation at the FastAPI boundary.
+    """
     service = ElectionSpendingService(db)
     return await service.get_all_spending()
 
@@ -58,8 +67,12 @@ async def get_ready_election_cycles(
 async def get_election_spending_by_cycle(
     cycle: int = Depends(validate_even_cycle),
     db: AsyncSession = Depends(get_db),
-) -> ElectionSpending:
-    """Fetch spending summary for a specific election cycle."""
+) -> MvElectionSpendingSummary:
+    """Fetch spending summary for a specific election cycle.
+
+    Returns the raw view row; response_model=ElectionSpending handles the
+    actual API-facing conversion/validation at the FastAPI boundary.
+    """
     service = ElectionSpendingService(db)
     row = await service.get_spending_by_cycle(cycle)
 

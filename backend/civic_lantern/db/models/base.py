@@ -1,13 +1,17 @@
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
+
 
 # NOTE: When adding a new model, remember to add the table name to the trigger list
 # in the migration file.
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
+
 
 # Separate base for read-only database views (materialized views, etc.).
 # Models that inherit from ViewBase are excluded from Base.metadata, so they
 # are invisible to Alembic autogenerate and integration test create_all/drop_all.
-ViewBase = declarative_base()
+class ViewBase(DeclarativeBase):
+    pass
 
 
 def enum_values_callable(enum_class):

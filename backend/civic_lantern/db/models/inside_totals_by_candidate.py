@@ -1,7 +1,8 @@
 from sqlalchemy import Column, ForeignKey, Integer, Numeric, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from civic_lantern.db.models.base import Base
+from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.mixins import TimestampMixin
 
 
@@ -16,7 +17,7 @@ class InsideTotalsByCandidate(Base, TimestampMixin):
     receipts = Column(Numeric(15, 2))
     disbursements = Column(Numeric(15, 2))
 
-    candidate = relationship("Candidate")
+    candidate: Mapped[Candidate] = relationship("Candidate")
 
     def __repr__(self) -> str:
         return (

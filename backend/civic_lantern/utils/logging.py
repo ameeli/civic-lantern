@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 class UTCFormatter(logging.Formatter):
     """Log formatter that renders timestamps in UTC."""
 
-    def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         utc_dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
         if datefmt:
             return utc_dt.strftime(datefmt)

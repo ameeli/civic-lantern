@@ -6,6 +6,7 @@ from sqlalchemy import text
 from civic_lantern.core.cycles import active_cycles
 from civic_lantern.db.session import JobSessionLocal
 from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY, SPENDING_INGESTOR_NAMES
+from civic_lantern.services.data.base import UpsertStats
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
@@ -52,7 +53,7 @@ class IngestionManager:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         **kwargs: Any,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[UpsertStats]:
         """Run a single ingestor by entity name."""
         if self._client is None:
             raise RuntimeError(

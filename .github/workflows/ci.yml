@@ -21,9 +21,7 @@ jobs:
       - run: poetry install --no-interaction --no-ansi
       - run: poetry run ruff check .
       - run: poetry run black --check .
-      - name: mypy (informational only; not blocking yet - see backend/pyproject.toml)
-        run: poetry run mypy .
-        continue-on-error: true
+      - run: poetry run mypy .
       - run: poetry run pip-audit
 
   backend-tests:

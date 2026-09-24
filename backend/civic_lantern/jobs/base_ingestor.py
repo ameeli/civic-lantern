@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.ingestion_run import IngestionRunStatus
-from civic_lantern.services.data.base import BaseService
+from civic_lantern.services.data.base import BaseService, UpsertStats
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 from civic_lantern.services.fec_exceptions import PartialFetchError
@@ -33,7 +33,7 @@ class BaseIngestor(ABC):
     async def run(
         self,
         **kwargs: Any,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[UpsertStats]:
         """Execute the ingestion pipeline: fetch → transform → upsert.
 
         Tracks the attempt in `ingestion_runs`, keyed by (entity_name, cycle).

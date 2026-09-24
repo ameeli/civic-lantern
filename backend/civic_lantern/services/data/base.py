@@ -1,21 +1,38 @@
 import logging
-from typing import Any, Dict, Generic, List, Type, TypeVar, Union
+from typing import Any, Dict, Generic, List, Type, TypedDict, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from sqlalchemy import exc, func, inspect, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+T = TypeVar("T", bound=DeclarativeBase)
+
+
+class UpsertStats(TypedDict):
+    inserted: int
+    updated: int
+    errors: int
+    failed_ids: List[Any]
+
+
+class _BatchStats(TypedDict):
+    inserted: int
+    updated: int
+    error_count: int
+    failed_ids: List[Any]
 
 
 class BaseService(Generic[T]):
     def __init__(self, model: Type[T], db: AsyncSession):
         self.model = model
         self.db = db
-        self.pk_name = inspect(self.model).primary_key[0].name
+        mapper = inspect(self.model)
+        assert mapper is not None
+        self.pk_name = mapper.primary_key[0].name
 
         if not hasattr(self, "index_elements"):
             self.index_elements = [self.pk_name]
@@ -27,7 +44,7 @@ class BaseService(Generic[T]):
                 stmt = stmt.where(getattr(self.model, field) == value)
         return stmt
 
-    async def get_by_id(self, id: str):
+    async def get_by_id(self, id: Any):
         """Fetch a single record by its primary key."""
         pk_column = getattr(self.model, self.pk_name)
         result = await self.db.execute(select(self.model).filter(pk_column == id))
@@ -56,7 +73,7 @@ class BaseService(Generic[T]):
 
     async def upsert_batch(
         self, data: Union[List[dict], List[BaseModel]], batch_size: int = 500
-    ) -> Dict[str, Any]:
+    ) -> UpsertStats:
         """
         Generic upsert. Tries to insert in batches.
         If a batch fails, falls back to row-by-row processing.
@@ -64,17 +81,29 @@ class BaseService(Generic[T]):
         if not data:
             return {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
 
-        if data and isinstance(data[0], BaseModel):
+        rows: List[dict]
+        if isinstance(data[0], BaseModel):
+            # Callers always pass a homogeneous list (all dicts or all
+            # BaseModel), never mixed - the isinstance check on the first
+            # item establishes that for the whole list.
+            model_items = cast(List[BaseModel], data)
             table_columns = {col.name for col in self.model.__table__.columns}
-            data = [
+            rows = [
                 {k: v for k, v in item.model_dump().items() if k in table_columns}
-                for item in data
+                for item in model_items
             ]
+        else:
+            rows = cast(List[dict], data)
 
-        stats = {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
+        stats: UpsertStats = {
+            "inserted": 0,
+            "updated": 0,
+            "errors": 0,
+            "failed_ids": [],
+        }
 
-        for i in range(0, len(data), batch_size):
-            batch = data[i : i + batch_size]
+        for i in range(0, len(rows), batch_size):
+            batch = rows[i : i + batch_size]
 
             try:
                 inserted, updated = await self._execute_upsert(batch)
@@ -111,9 +140,14 @@ class BaseService(Generic[T]):
 
         return stats
 
-    async def _process_batch_individually(self, batch: List[dict]) -> Dict[str, Any]:
+    async def _process_batch_individually(self, batch: List[dict]) -> _BatchStats:
         """Helper to process a failed batch one row at a time."""
-        stats = {"inserted": 0, "updated": 0, "error_count": 0, "failed_ids": []}
+        stats: _BatchStats = {
+            "inserted": 0,
+            "updated": 0,
+            "error_count": 0,
+            "failed_ids": [],
+        }
 
         for row in batch:
             row_id = row.get(self.pk_name, "UNKNOWN")
@@ -157,7 +191,7 @@ class BaseService(Generic[T]):
             if name != "updated_at"
         ]
 
-        upsert_stmt = stmt.on_conflict_do_update(
+        upsert_stmt: Any = stmt.on_conflict_do_update(
             index_elements=self.index_elements,
             set_=update_cols,
             where=or_(*changed_conditions) if changed_conditions else None,
