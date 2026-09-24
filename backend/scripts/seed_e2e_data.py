@@ -6,9 +6,14 @@ every run, so this inserts synthetic-but-representative rows directly and
 marks the cycle "ready" the same way a real ingestion run would. Idempotent
 — re-running deletes and re-inserts its own rows (identified by the
 E2ESEED candidate_id prefix) rather than accumulating duplicates.
+
+Destructive: it also deletes every cycle-2024 IngestionRun row for the
+spending ingestors, so it refuses to run unless ALLOW_SEED_E2E_DATA=1 is set.
+Only set that against a disposable database (e.g. the CI Postgres service).
 """
 
 import asyncio
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -63,6 +68,12 @@ def _roster(office: OfficeTypeEnum, count: int, top_disbursements: int) -> list[
 
 
 async def seed() -> None:
+    if os.environ.get("ALLOW_SEED_E2E_DATA") != "1":
+        raise SystemExit(
+            "Refusing to seed: this script deletes real cycle-2024 ingestion "
+            "history and inserts synthetic candidates. Set ALLOW_SEED_E2E_DATA=1 "
+            "only when DATABASE_URL_ASYNC points at a disposable database."
+        )
     async with JobSessionLocal() as session:
         await session.execute(
             delete(ScheduleETotalsByCandidate).where(
