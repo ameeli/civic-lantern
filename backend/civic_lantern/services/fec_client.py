@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NoReturn
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -73,7 +73,9 @@ class FECClient:
             except httpx.RequestError as e:
                 raise FECAPIError(f"Request failed: {e}") from e
 
-    def _raise_fec_error(self, e: httpx.HTTPStatusError, *, url: str, params: dict):
+    def _raise_fec_error(
+        self, e: httpx.HTTPStatusError, *, url: str, params: dict
+    ) -> NoReturn:
         response = e.response
         status = response.status_code
 

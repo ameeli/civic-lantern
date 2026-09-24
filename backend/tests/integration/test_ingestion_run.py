@@ -195,6 +195,7 @@ class TestIngestionRunServiceOverlapGuard:
         await service.reset_stale_runs(timeout_minutes=180)
 
         run = await service._find("candidates", cycle=None)
+        assert run is not None
         assert run.status == IngestionRunStatus.FAILED
 
     async def test_reset_stale_runs_leaves_recent_runs_alone(
@@ -206,6 +207,7 @@ class TestIngestionRunServiceOverlapGuard:
         await service.reset_stale_runs(timeout_minutes=180)
 
         refreshed = await service._find("candidates", cycle=None)
+        assert refreshed is not None
         assert refreshed.status == IngestionRunStatus.IN_PROGRESS
         assert refreshed.id == run.id
 
@@ -223,12 +225,14 @@ class TestIngestionRunServiceReadyCycles:
         candidate = Candidate(candidate_id=f"C{cycle}", name="Test Candidate")
         async_db.add(candidate)
         await async_db.flush()
+        # Decimal is the correct runtime type for a Numeric column; the
+        # classic Column()-mapping mypy plugin can't infer that generically.
         async_db.add(
             InsideTotalsByCandidate(
                 candidate_id=candidate.candidate_id,
                 cycle=cycle,
-                receipts=Decimal("100.00"),
-                disbursements=Decimal("50.00"),
+                receipts=Decimal("100.00"),  # type: ignore[arg-type]
+                disbursements=Decimal("50.00"),  # type: ignore[arg-type]
             )
         )
         async_db.add(
@@ -236,7 +240,7 @@ class TestIngestionRunServiceReadyCycles:
                 candidate_id=candidate.candidate_id,
                 cycle=cycle,
                 support_oppose_indicator=SupportOpposeEnum.SUPPORT,
-                total=Decimal("25.00"),
+                total=Decimal("25.00"),  # type: ignore[arg-type]
             )
         )
         await async_db.commit()

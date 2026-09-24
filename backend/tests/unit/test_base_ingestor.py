@@ -29,7 +29,13 @@ class FakeIngestor(BaseIngestor):
         self._transform_return = transform_return or []
         self._fetch_error = fetch_error
 
-    async def fetch(self, start_date: str, end_date: str, **kwargs: Any) -> list:
+    # Each concrete ingestor requires only the specific kwargs its FEC
+    # endpoint needs; IngestionManager always threads the matching ones
+    # through run()'s **kwargs, so this is safe in practice even though it
+    # narrows the base class's fully-generic **kwargs signature.
+    async def fetch(  # type: ignore[override]
+        self, start_date: str, end_date: str, **kwargs: Any
+    ) -> list:
         if self._fetch_error:
             raise self._fetch_error
         return self._fetch_return
@@ -57,7 +63,7 @@ class CycleScopedFakeIngestor(BaseIngestor):
         super().__init__(client, session)
         self.captured_kwargs: Dict[str, Any] = {}
 
-    async def fetch(self, cycle: int, **kwargs: Any) -> list:
+    async def fetch(self, cycle: int, **kwargs: Any) -> list:  # type: ignore[override]
         self.captured_kwargs = kwargs
         return []
 

@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, cast
 
-from sqlalchemy import distinct, func, select, update
+from sqlalchemy import CursorResult, distinct, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.ingestion_run import IngestionRun, IngestionRunStatus
@@ -112,7 +112,7 @@ class IngestionRunService(BaseService[IngestionRun]):
                 error_message="Run exceeded overlap-guard timeout; marked failed.",
             )
         )
-        result = await self.db.execute(stmt)
+        result = cast(CursorResult, await self.db.execute(stmt))
         await self.db.commit()
         if result.rowcount:
             logger.warning(
@@ -168,4 +168,6 @@ class IngestionRunService(BaseService[IngestionRun]):
         outside_cycles = set((await self.db.execute(outside_stmt)).scalars().all())
 
         ready = set(candidate_cycles) & inside_cycles & outside_cycles
-        return sorted(ready, reverse=True)
+        # candidate_cycles already excludes None (the query below filters
+        # IngestionRun.cycle.isnot(None)); mypy can't know that statically.
+        return sorted((c for c in ready if c is not None), reverse=True)

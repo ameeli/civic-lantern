@@ -13,7 +13,12 @@ class ScheduleETotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "schedule_e_totals_by_candidate"
 
-    async def fetch(self, cycle: int, **kwargs: Any) -> List[Dict[str, Any]]:
+    # IngestionManager always threads a matching `cycle` kwarg for this
+    # cycle-scoped ingestor, so narrowing the base class's fully-generic
+    # **kwargs signature is safe in practice.
+    async def fetch(  # type: ignore[override]
+        self, cycle: int, **kwargs: Any
+    ) -> List[Dict[str, Any]]:
         """Fetch IE totals per candidate for the given cycle."""
         return await self.client.get_candidate_schedule_e_totals(cycle=cycle, **kwargs)
 

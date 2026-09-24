@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -111,11 +112,12 @@ class TestGetWatermark:
         assert await service.get_watermark("candidates") is None
 
     async def test_returns_last_run_completed_at(self, mock_session: AsyncMock):
+        completed_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
         run = IngestionRun(
             ingestor_name="candidates",
-            last_run_completed_at="2026-01-01T00:00:00+00:00",
+            last_run_completed_at=completed_at,
         )
         mock_session.execute.return_value = scalars_first_result(run)
         service = IngestionRunService(mock_session)
 
-        assert await service.get_watermark("candidates") == "2026-01-01T00:00:00+00:00"
+        assert await service.get_watermark("candidates") == completed_at

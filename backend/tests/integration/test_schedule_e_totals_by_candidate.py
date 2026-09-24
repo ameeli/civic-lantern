@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
+from civic_lantern.db.models.enums import SupportOpposeEnum
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
 )
@@ -32,18 +33,20 @@ async def seeded(async_db: AsyncSession):
         candidates=[
             Candidate(candidate_id="P001", name="Alice", state="CA", party="DEM"),
         ],
+        # Decimal is the correct runtime type for a Numeric column; the
+        # classic Column()-mapping mypy plugin can't infer that generically.
         rows=[
             ScheduleETotalsByCandidate(
                 candidate_id="P001",
                 cycle=2024,
-                support_oppose_indicator="S",
-                total=Decimal("2000000.00"),
+                support_oppose_indicator=SupportOpposeEnum.SUPPORT,
+                total=Decimal("2000000.00"),  # type: ignore[arg-type]
             ),
             ScheduleETotalsByCandidate(
                 candidate_id="P001",
                 cycle=2024,
-                support_oppose_indicator="O",
-                total=Decimal("500000.00"),
+                support_oppose_indicator=SupportOpposeEnum.OPPOSE,
+                total=Decimal("500000.00"),  # type: ignore[arg-type]
             ),
         ],
     )

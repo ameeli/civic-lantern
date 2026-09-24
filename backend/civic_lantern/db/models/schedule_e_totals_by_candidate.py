@@ -1,8 +1,9 @@
 from sqlalchemy import Column, ForeignKey, Integer, Numeric, String
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship
 
 from civic_lantern.db.models.base import Base, enum_values_callable
+from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.enums import SupportOpposeEnum
 from civic_lantern.db.models.mixins import TimestampMixin
 
@@ -26,7 +27,7 @@ class ScheduleETotalsByCandidate(Base, TimestampMixin):
 
     total = Column(Numeric(14, 2))
 
-    candidate = relationship("Candidate")
+    candidate: Mapped[Candidate] = relationship("Candidate")
 
     def __repr__(self) -> str:
         return (

@@ -80,7 +80,12 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "inside_totals_by_candidate"
 
-    async def fetch(self, cycle: int, **kwargs: Any) -> List[Dict[str, Any]]:
+    # IngestionManager always threads a matching `cycle` kwarg for this
+    # cycle-scoped ingestor, so narrowing the base class's fully-generic
+    # **kwargs signature is safe in practice.
+    async def fetch(  # type: ignore[override]
+        self, cycle: int, **kwargs: Any
+    ) -> List[Dict[str, Any]]:
         """Fetch inside spending totals for all candidates in the given cycle."""
         raw = await self.client.get_candidate_totals(cycle=cycle, **kwargs)
         raw = self._exclude_split_candidates(raw, cycle)

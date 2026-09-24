@@ -111,7 +111,7 @@ async def seed() -> None:
                     state=row["state"],
                     district="00",
                     incumbent_challenge="C",
-                    cycles=[CYCLE],
+                    cycles=[CYCLE],  # type: ignore[list-item]
                 )
             )
         await session.flush()

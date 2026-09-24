@@ -94,8 +94,8 @@ async def db_with_mv():
 async def _seed_and_refresh(
     session,
     candidates: list,
-    inside_rows: list = None,
-    outside_rows: list = None,
+    inside_rows: list | None = None,
+    outside_rows: list | None = None,
 ) -> None:
     for c in candidates:
         session.add(c)

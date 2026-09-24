@@ -35,18 +35,20 @@ async def two_candidates(async_db: AsyncSession):
             Candidate(candidate_id="C001", name="Alice", state="CA", party="DEM"),
             Candidate(candidate_id="C002", name="Bob", state="TX", party="REP"),
         ],
+        # Decimal is the correct runtime type for a Numeric column; the
+        # classic Column()-mapping mypy plugin can't infer that generically.
         rows=[
             InsideTotalsByCandidate(
                 candidate_id="C001",
                 cycle=2024,
-                receipts=Decimal("500000.00"),
-                disbursements=Decimal("480000.00"),
+                receipts=Decimal("500000.00"),  # type: ignore[arg-type]
+                disbursements=Decimal("480000.00"),  # type: ignore[arg-type]
             ),
             InsideTotalsByCandidate(
                 candidate_id="C002",
                 cycle=2024,
-                receipts=Decimal("300000.00"),
-                disbursements=Decimal("290000.00"),
+                receipts=Decimal("300000.00"),  # type: ignore[arg-type]
+                disbursements=Decimal("290000.00"),  # type: ignore[arg-type]
             ),
         ],
     )
