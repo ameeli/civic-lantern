@@ -242,9 +242,8 @@ poetry run pytest --cov=civic_lantern                           # With coverage
 poetry run ruff check .            # Lint (pycodestyle, pyflakes, isort)
 poetry run ruff check --fix .      # Lint with auto-fix
 poetry run black .                 # Format
-poetry run mypy .                  # Type check (non-blocking in CI for now)
+poetry run mypy .                  # Type check
 poetry run pip-audit               # Dependency vulnerability scan
 ```
 
-CI (`.github/workflows/ci.yml`) runs all of these on every PR; mypy is
-`continue-on-error` until its existing type errors are fixed.
+CI (`.github/workflows/ci.yml`) runs all of these on every PR as blocking checks.
