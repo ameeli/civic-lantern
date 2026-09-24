@@ -20,6 +20,7 @@ class CommitteeIn(BaseModel):
     @classmethod
     def coerce_null_to_empty_list(cls, v: Any) -> Any:
         return v if v is not None else []
+
     cycles: list[int] = Field(default_factory=list)
 
     designation: Optional[str] = None

@@ -10,12 +10,14 @@ const bounds = { min: 0, max: 1000 };
 const value = { min: 200, max: 800 };
 const candidateSpends = [50, 150, 250, 500, 750, 900];
 
-function renderSlider(overrides: {
-  bounds?: typeof bounds;
-  value?: typeof value;
-  candidateSpends?: number[];
-  onCommit?: (next: typeof value) => void;
-} = {}) {
+function renderSlider(
+  overrides: {
+    bounds?: typeof bounds;
+    value?: typeof value;
+    candidateSpends?: number[];
+    onCommit?: (next: typeof value) => void;
+  } = {},
+) {
   return render(
     <CandidateRangeSlider
       bounds={overrides.bounds ?? bounds}

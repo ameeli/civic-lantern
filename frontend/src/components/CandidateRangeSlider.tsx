@@ -135,10 +135,7 @@ export default function CandidateRangeSlider({
       parsed === null
         ? liveRef.current.min
         : clampMin(parsed, liveRef.current.max, bounds.min);
-    const next = clampToCap(
-      { min: snapped, max: liveRef.current.max },
-      "min",
-    );
+    const next = clampToCap({ min: snapped, max: liveRef.current.max }, "min");
     setLiveRange(next);
     onCommit(next);
   }
@@ -149,10 +146,7 @@ export default function CandidateRangeSlider({
       parsed === null
         ? liveRef.current.max
         : clampMax(parsed, liveRef.current.min, bounds.max);
-    const next = clampToCap(
-      { min: liveRef.current.min, max: snapped },
-      "max",
-    );
+    const next = clampToCap({ min: liveRef.current.min, max: snapped }, "max");
     setLiveRange(next);
     onCommit(next);
   }

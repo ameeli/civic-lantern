@@ -134,9 +134,7 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
             if split_cycle != cycle:
                 continue
 
-            reports = await self.client.get_committee_reports(
-                committee_id, cycle=cycle
-            )
+            reports = await self.client.get_committee_reports(committee_id, cycle=cycle)
             authoritative = [r for r in reports if r.get("most_recent")]
             if not authoritative:
                 raise CommitteeSplitDataError(

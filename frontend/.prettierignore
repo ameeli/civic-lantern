@@ -1,0 +1,9 @@
+.next/
+node_modules/
+test-results/
+playwright-report/
+next-env.d.ts
+
+# Hand-aligned design tokens and commented multi-value CSS properties;
+# prettier's reformatting repositions the inline comments in a misleading way.
+src/app/globals.css

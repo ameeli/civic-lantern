@@ -6,6 +6,26 @@ on:
     branches: [main]
 
 jobs:
+  backend-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install --upgrade pip
+      - run: pip install poetry
+      - run: poetry install --no-interaction --no-ansi
+      - run: poetry run ruff check .
+      - run: poetry run black --check .
+      - name: mypy (informational only; not blocking yet - see backend/pyproject.toml)
+        run: poetry run mypy .
+        continue-on-error: true
+      - run: poetry run pip-audit
+
   backend-tests:
     runs-on: ubuntu-latest
     defaults:
@@ -38,6 +58,25 @@ jobs:
       - run: poetry install --no-interaction --no-ansi
       - run: poetry run pytest
 
+  frontend-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx prettier --check .
+      - run: npx next typegen
+      - run: npx tsc --noEmit
+      - run: npm audit --audit-level=high
+
   frontend-tests:
     runs-on: ubuntu-latest
     defaults:
@@ -53,3 +92,78 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: civic_lantern_user
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: civic_lantern_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_ASYNC: postgresql+asyncpg://civic_lantern_user:devpassword123@localhost:5432/civic_lantern_dev
+      TEST_DATABASE_URL_ASYNC: postgresql+asyncpg://civic_lantern_user:devpassword123@localhost:5432/civic_lantern_dev
+      ALEMBIC_DATABASE_URL: postgresql+psycopg2://civic_lantern_user:devpassword123@localhost:5432/civic_lantern_dev
+      FEC_API_KEY: unused-in-ci
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install poetry
+          poetry install --no-interaction --no-ansi
+      - name: Run migrations
+        working-directory: backend
+        run: poetry run alembic upgrade head
+      - name: Seed e2e fixture data (synthetic, not real FEC data - see backend/scripts/seed_e2e_data.py)
+        working-directory: backend
+        env:
+          ALLOW_SEED_E2E_DATA: "1"
+        run: poetry run python -m scripts.seed_e2e_data
+      - name: Start backend
+        working-directory: backend
+        run: nohup poetry run uvicorn civic_lantern.main:app --port 8000 > /tmp/backend.log 2>&1 &
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/election-spending/cycles && exit 0
+            sleep 1
+          done
+          cat /tmp/backend.log
+          exit 1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run e2e tests
+        working-directory: frontend
+        run: npx playwright test
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

@@ -75,7 +75,9 @@ test.describe("Candidate spending pack chart: dollar-range slider", () => {
     await page.locator("circle.fill-office-senate").click();
 
     // Breadcrumb reflects the drill-in.
-    await expect(page.getByRole("navigation").getByText("Senate", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("navigation").getByText("Senate", { exact: true }),
+    ).toBeVisible();
 
     // Slider appears with the default top-30 range.
     await expect(page.getByText(/Candidates in range: 30/)).toBeVisible();
@@ -128,9 +130,7 @@ test.describe("Candidate spending pack chart: dollar-range slider", () => {
     // The count label updates synchronously from the slider's own state, but
     // the actual SVG rebuild happens a tick later via the parent's effect —
     // poll rather than taking a one-shot count.
-    await expect(page.locator('circle[opacity="0.7"]')).toHaveCount(
-      countAfter,
-    );
+    await expect(page.locator('circle[opacity="0.7"]')).toHaveCount(countAfter);
   });
 
   test("Senate's office-bubble size is unaffected by narrowing its slider range", async ({
@@ -153,7 +153,10 @@ test.describe("Candidate spending pack chart: dollar-range slider", () => {
     await page.mouse.up();
 
     // Zoom back out to root and compare the office bubble's radius.
-    await page.getByRole("navigation").getByText("All Races", { exact: true }).click();
+    await page
+      .getByRole("navigation")
+      .getByText("All Races", { exact: true })
+      .click();
     await expect(page.locator("circle.fill-office-senate")).toBeVisible();
 
     // The zoom-out animates for 750ms before the range resets and the chart

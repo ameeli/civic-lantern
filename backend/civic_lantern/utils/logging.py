@@ -21,7 +21,8 @@ def configure_logging() -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(
         UTCFormatter(
-            fmt="%(asctime)s [%(levelname)s] %(process)d %(name)s %(filename)s:%(lineno)d: %(message)s",
+            fmt="%(asctime)s [%(levelname)s] %(process)d %(name)s "
+            "%(filename)s:%(lineno)d: %(message)s",
             datefmt="%Y-%m-%dT%H:%M:%S%z",
         )
     )

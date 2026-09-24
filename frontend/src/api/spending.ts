@@ -21,7 +21,9 @@ export const getElectionSpendingByCycle = cache((cycle: number) => {
   return apiFetch<ElectionSpending>(`/election-spending/${cycle}`);
 });
 
-export const listCandidatesSpending = (params: CandidateSpendingParams = {}) => {
+export const listCandidatesSpending = (
+  params: CandidateSpendingParams = {},
+) => {
   const query = new URLSearchParams();
   if (params.cycle !== undefined) query.set("cycle", String(params.cycle));
   if (params.limit !== undefined) query.set("limit", String(params.limit));

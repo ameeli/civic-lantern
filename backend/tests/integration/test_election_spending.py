@@ -28,8 +28,10 @@ MV_CANDIDATE_SQL = """
     ),
     outside AS (
         SELECT candidate_id, cycle,
-               SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END) AS outside_support,
-               SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END) AS outside_oppose
+               SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END)
+                   AS outside_support,
+               SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END)
+                   AS outside_oppose
         FROM schedule_e_totals_by_candidate
         GROUP BY candidate_id, cycle
     ),
@@ -98,8 +100,12 @@ async def db_with_mv():
         yield session
 
     async with engine.begin() as conn:
-        await conn.execute(text("DROP MATERIALIZED VIEW IF EXISTS mv_election_spending_summary"))
-        await conn.execute(text("DROP MATERIALIZED VIEW IF EXISTS mv_candidate_spending_summary"))
+        await conn.execute(
+            text("DROP MATERIALIZED VIEW IF EXISTS mv_election_spending_summary")
+        )
+        await conn.execute(
+            text("DROP MATERIALIZED VIEW IF EXISTS mv_candidate_spending_summary")
+        )
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
@@ -121,8 +127,12 @@ async def _seed_and_refresh(
         session.add(row)
     await session.flush()
 
-    await session.execute(text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary"))
-    await session.execute(text("REFRESH MATERIALIZED VIEW mv_election_spending_summary"))
+    await session.execute(
+        text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary")
+    )
+    await session.execute(
+        text("REFRESH MATERIALIZED VIEW mv_election_spending_summary")
+    )
     await session.commit()
 
 
@@ -135,8 +145,10 @@ class TestElectionSpendingServiceIntegration:
             candidates=[Candidate(candidate_id="C001", name="Alice")],
             inside_rows=[
                 InsideTotalsByCandidate(
-                    candidate_id="C001", cycle=2024,
-                    receipts=Decimal("100000.00"), disbursements=Decimal("80000.00"),
+                    candidate_id="C001",
+                    cycle=2024,
+                    receipts=Decimal("100000.00"),
+                    disbursements=Decimal("80000.00"),
                 )
             ],
         )
@@ -155,8 +167,12 @@ class TestElectionSpendingServiceIntegration:
                 Candidate(candidate_id="C003", name="Carol"),
             ],
             inside_rows=[
-                InsideTotalsByCandidate(candidate_id="C002", cycle=2020, disbursements=Decimal("50000.00")),
-                InsideTotalsByCandidate(candidate_id="C003", cycle=2022, disbursements=Decimal("60000.00")),
+                InsideTotalsByCandidate(
+                    candidate_id="C002", cycle=2020, disbursements=Decimal("50000.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C003", cycle=2022, disbursements=Decimal("60000.00")
+                ),
             ],
         )
 
@@ -168,8 +184,12 @@ class TestElectionSpendingServiceIntegration:
         assert results[1].cycle == 2020
 
     async def test_get_all_spending_empty_mv_returns_empty_list(self, db_with_mv):
-        await db_with_mv.execute(text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary"))
-        await db_with_mv.execute(text("REFRESH MATERIALIZED VIEW mv_election_spending_summary"))
+        await db_with_mv.execute(
+            text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary")
+        )
+        await db_with_mv.execute(
+            text("REFRESH MATERIALIZED VIEW mv_election_spending_summary")
+        )
         await db_with_mv.commit()
 
         service = ElectionSpendingService(db=db_with_mv)
@@ -185,8 +205,12 @@ class TestElectionSpendingServiceIntegration:
                 Candidate(candidate_id="C005", name="Eve"),
             ],
             inside_rows=[
-                InsideTotalsByCandidate(candidate_id="C004", cycle=2020, disbursements=Decimal("40000.00")),
-                InsideTotalsByCandidate(candidate_id="C005", cycle=2024, disbursements=Decimal("70000.00")),
+                InsideTotalsByCandidate(
+                    candidate_id="C004", cycle=2020, disbursements=Decimal("40000.00")
+                ),
+                InsideTotalsByCandidate(
+                    candidate_id="C005", cycle=2024, disbursements=Decimal("70000.00")
+                ),
             ],
         )
 
@@ -197,8 +221,12 @@ class TestElectionSpendingServiceIntegration:
         assert result.cycle == 2024
 
     async def test_get_spending_by_cycle_unknown_cycle_returns_none(self, db_with_mv):
-        await db_with_mv.execute(text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary"))
-        await db_with_mv.execute(text("REFRESH MATERIALIZED VIEW mv_election_spending_summary"))
+        await db_with_mv.execute(
+            text("REFRESH MATERIALIZED VIEW mv_candidate_spending_summary")
+        )
+        await db_with_mv.execute(
+            text("REFRESH MATERIALIZED VIEW mv_election_spending_summary")
+        )
         await db_with_mv.commit()
 
         service = ElectionSpendingService(db=db_with_mv)
@@ -216,19 +244,43 @@ class TestElectionSpendingServiceIntegration:
             ],
             inside_rows=[
                 InsideTotalsByCandidate(
-                    candidate_id="C006", cycle=2024,
-                    receipts=Decimal("100000.00"), disbursements=Decimal("80000.00"),
+                    candidate_id="C006",
+                    cycle=2024,
+                    receipts=Decimal("100000.00"),
+                    disbursements=Decimal("80000.00"),
                 ),
                 InsideTotalsByCandidate(
-                    candidate_id="C007", cycle=2024,
-                    receipts=Decimal("50000.00"), disbursements=Decimal("40000.00"),
+                    candidate_id="C007",
+                    cycle=2024,
+                    receipts=Decimal("50000.00"),
+                    disbursements=Decimal("40000.00"),
                 ),
             ],
             outside_rows=[
-                ScheduleETotalsByCandidate(candidate_id="C006", cycle=2024, support_oppose_indicator="S", total=Decimal("20000.00")),
-                ScheduleETotalsByCandidate(candidate_id="C006", cycle=2024, support_oppose_indicator="O", total=Decimal("4000.00")),
-                ScheduleETotalsByCandidate(candidate_id="C007", cycle=2024, support_oppose_indicator="S", total=Decimal("10000.00")),
-                ScheduleETotalsByCandidate(candidate_id="C007", cycle=2024, support_oppose_indicator="O", total=Decimal("6000.00")),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C006",
+                    cycle=2024,
+                    support_oppose_indicator="S",
+                    total=Decimal("20000.00"),
+                ),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C006",
+                    cycle=2024,
+                    support_oppose_indicator="O",
+                    total=Decimal("4000.00"),
+                ),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C007",
+                    cycle=2024,
+                    support_oppose_indicator="S",
+                    total=Decimal("10000.00"),
+                ),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C007",
+                    cycle=2024,
+                    support_oppose_indicator="O",
+                    total=Decimal("6000.00"),
+                ),
             ],
         )
 
@@ -245,19 +297,31 @@ class TestElectionSpendingServiceIntegration:
         assert result.global_influence_ratio == Decimal("0.33")
 
     async def test_global_influence_ratio_handles_zero_disbursements(self, db_with_mv):
-        """NULLIF prevents division by zero — ratio should be None when disbursements = 0."""
+        """NULLIF prevents division by zero — ratio is None when disbursements = 0."""
         await _seed_and_refresh(
             db_with_mv,
             candidates=[Candidate(candidate_id="C008", name="Zero Spend")],
             inside_rows=[
                 InsideTotalsByCandidate(
-                    candidate_id="C008", cycle=2024,
-                    receipts=Decimal("1000.00"), disbursements=Decimal("0.00"),
+                    candidate_id="C008",
+                    cycle=2024,
+                    receipts=Decimal("1000.00"),
+                    disbursements=Decimal("0.00"),
                 )
             ],
             outside_rows=[
-                ScheduleETotalsByCandidate(candidate_id="C008", cycle=2024, support_oppose_indicator="S", total=Decimal("500.00")),
-                ScheduleETotalsByCandidate(candidate_id="C008", cycle=2024, support_oppose_indicator="O", total=Decimal("100.00")),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C008",
+                    cycle=2024,
+                    support_oppose_indicator="S",
+                    total=Decimal("500.00"),
+                ),
+                ScheduleETotalsByCandidate(
+                    candidate_id="C008",
+                    cycle=2024,
+                    support_oppose_indicator="O",
+                    total=Decimal("100.00"),
+                ),
             ],
         )
 

@@ -30,8 +30,10 @@ def upgrade() -> None:
         ),
         outside AS (
             SELECT candidate_id, cycle,
-                SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END) AS outside_support,
-                SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END) AS outside_oppose
+                SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END)
+                    AS outside_support,
+                SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END)
+                    AS outside_oppose
             FROM schedule_e_totals_by_candidate
             GROUP BY candidate_id, cycle
         ),
