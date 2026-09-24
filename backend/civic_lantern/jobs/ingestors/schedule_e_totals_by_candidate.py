@@ -8,7 +8,8 @@ from civic_lantern.utils.transformers import transform_schedule_e_totals_by_cand
 
 
 class ScheduleETotalsByCandidateIngestor(BaseIngestor):
-    """Ingests outside spending totals from /schedules/schedule_e/totals/by_candidate/."""
+    """Ingests outside spending totals from the FEC schedule_e totals-by-candidate
+    feed."""
 
     entity_name = "schedule_e_totals_by_candidate"
 

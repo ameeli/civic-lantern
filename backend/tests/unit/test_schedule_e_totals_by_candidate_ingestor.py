@@ -16,7 +16,7 @@ class TestScheduleETotalsByCandidateIngestor:
     async def test_fetch_calls_get_candidate_schedule_e_totals(
         self, mock_client, mock_session
     ):
-        """fetch() delegates to client.get_candidate_schedule_e_totals with correct cycle."""
+        """fetch() delegates to client.get_candidate_schedule_e_totals with cycle."""
         mock_client.get_candidate_schedule_e_totals.return_value = [
             {
                 "candidate_id": "P001",

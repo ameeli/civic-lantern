@@ -258,8 +258,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
           ? undefined
           : (
               target.ancestors().find((n) => n.depth === 1)?.data as
-                | RaceNode
-                | undefined
+                RaceNode | undefined
             )?.code;
       const clearRangeIfLeavingOffice = () =>
         setActiveRange((prev) =>

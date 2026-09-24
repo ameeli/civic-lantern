@@ -8,8 +8,13 @@ from civic_lantern.utils.logging import UTCFormatter, configure_logging
 
 def _make_record(utc_dt: datetime) -> logging.LogRecord:
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="", lineno=0,
-        msg="test", args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="test",
+        args=(),
+        exc_info=None,
     )
     record.created = utc_dt.timestamp()
     return record
@@ -74,10 +79,7 @@ class TestConfigureLogging:
 
         try:
             configure_logging()
-            assert any(
-                isinstance(h.formatter, UTCFormatter)
-                for h in root.handlers
-            )
+            assert any(isinstance(h.formatter, UTCFormatter) for h in root.handlers)
         finally:
             root.handlers = original_handlers
 

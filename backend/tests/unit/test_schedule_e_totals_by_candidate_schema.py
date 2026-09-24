@@ -31,7 +31,9 @@ class TestScheduleETotalsByCandidateIn:
 
     def test_missing_indicator_raises(self):
         with pytest.raises(ValidationError):
-            raw = {k: v for k, v in VALID_RAW.items() if k != "support_oppose_indicator"}
+            raw = {
+                k: v for k, v in VALID_RAW.items() if k != "support_oppose_indicator"
+            }
             ScheduleETotalsByCandidateIn.model_validate(raw)
 
     def test_invalid_indicator_raises(self):

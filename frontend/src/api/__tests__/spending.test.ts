@@ -73,7 +73,12 @@ describe("fetchAllCandidatesForOffice", () => {
   it("stops if a page comes back empty, even if total_count claims more", async () => {
     server.use(
       http.get("*/candidate-spending", () =>
-        HttpResponse.json({ items: [], total_count: 10, limit: 1000, offset: 0 }),
+        HttpResponse.json({
+          items: [],
+          total_count: 10,
+          limit: 1000,
+          offset: 0,
+        }),
       ),
     );
 

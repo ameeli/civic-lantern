@@ -35,7 +35,8 @@ async def client():
     """Standard fixture to ensure the httpx client is closed after tests.
 
     Rate limiters are replaced with permissive ones so retry/pagination tests
-    run at full speed. Limiter wiring is verified separately in TestFECClientRateLimiting.
+    run at full speed. Limiter wiring is verified separately in
+    TestFECClientRateLimiting.
     """
     async with FECClient() as client:
         client.limiter = AsyncLimiter(max_rate=10000, time_period=1)

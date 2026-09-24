@@ -4,7 +4,7 @@ from civic_lantern.db.models.base import ViewBase
 
 
 class MvCandidateSpendingSummary(ViewBase):
-    """Read-only SQLAlchemy model for the mv_candidate_spending_summary materialized view.
+    """Read-only SQLAlchemy model for the mv_candidate_spending_summary view.
 
     Inherits from ViewBase (not Base) so it is excluded from Alembic autogenerate
     and integration test create_all/drop_all.
