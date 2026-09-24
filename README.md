@@ -128,7 +128,7 @@ cd civic-lantern
 
 ## Testing
 
-Each half has its own test suite — see [`backend/README.md`](backend/README.md#testing) (pytest: unit + integration) and [`frontend/README.md`](frontend/README.md#testing) (Vitest).
+Each half has its own test suite — see [`backend/README.md`](backend/README.md#testing) (pytest: unit + integration) and [`frontend/README.md`](frontend/README.md#testing) (Vitest + Playwright). CI runs both, plus lint and dependency audits, via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 

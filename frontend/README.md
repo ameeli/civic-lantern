@@ -119,12 +119,17 @@ npm run test:e2e
 Playwright starts `npm run dev` itself (or reuses a server already on
 `http://localhost:3000`). The backend must be reachable at
 `http://127.0.0.1:8000/api/v1` with 2024 data loaded, because the spec reads
-expected values from the live API.
+expected values from the live API. CI loads synthetic 2024 data with
+`backend/scripts/seed_e2e_data.py` (disposable databases only; see its
+docstring).
 
 ## Linting
 
 ```bash
-npm run lint
+npm run lint              # ESLint
+npx prettier --check .    # Formatting (see .prettierignore for exclusions)
+npx next typegen          # Generate route types (PageProps etc.) for tsc
+npx tsc --noEmit          # Type check
 ```
 
 ## Notes
