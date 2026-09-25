@@ -29,10 +29,7 @@ class FakeIngestor(BaseIngestor):
         self._transform_return = transform_return or []
         self._fetch_error = fetch_error
 
-    # Each concrete ingestor requires only the specific kwargs its FEC
-    # endpoint needs; IngestionManager always threads the matching ones
-    # through run()'s **kwargs, so this is safe in practice even though it
-    # narrows the base class's fully-generic **kwargs signature.
+    # Narrower than the base **kwargs, like the real ingestors.
     async def fetch(  # type: ignore[override]
         self, start_date: str, end_date: str, **kwargs: Any
     ) -> list:
@@ -101,9 +98,7 @@ class TestBaseIngestorWorkflow:
     async def test_partial_fetch_error_ingests_partial_data_as_partial_success(
         self, MockRunService, mock_client, mock_session
     ):
-        """A PartialFetchError's records still get ingested, but the run is
-        marked PARTIAL_SUCCESS so the watermark isn't advanced past the gap.
-        """
+        """Partial records are ingested as PARTIAL_SUCCESS so the watermark holds."""
         run_row = object()
         mock_tracker = MockRunService.return_value
         mock_tracker.start_run = AsyncMock(return_value=run_row)
@@ -128,12 +123,42 @@ class TestBaseIngestorWorkflow:
         )
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
+    async def test_partial_fetch_fails_run_when_ingestor_rejects_partial_data(
+        self, MockRunService, mock_client, mock_session
+    ):
+        """accepts_partial_fetch=False: partial fetch fails the run, upserts nothing."""
+        run_row = object()
+        mock_tracker = MockRunService.return_value
+        mock_tracker.start_run = AsyncMock(return_value=run_row)
+        mock_tracker.complete_run = AsyncMock()
+
+        ingestor = FakeIngestor(
+            client=mock_client,
+            session=mock_session,
+            transform_return=["validated_obj"],
+            fetch_error=PartialFetchError(
+                "1/3 pages failed for fake", results=[{"id": "1"}], failed_pages=[2]
+            ),
+        )
+        ingestor.accepts_partial_fetch = False
+        service = AsyncMock()
+        ingestor.create_service = lambda: service
+
+        with pytest.raises(PartialFetchError):
+            await ingestor.run(start_date="2024-01-01", end_date="2024-06-01")
+
+        service.upsert_batch.assert_not_awaited()
+        mock_tracker.complete_run.assert_awaited_once_with(
+            run_row,
+            status=IngestionRunStatus.FAILED,
+            error_message="1/3 pages failed for fake",
+        )
+
+    @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
     async def test_upsert_errors_mark_partial_success(
         self, MockRunService, mock_client, mock_session
     ):
-        """Row-level upsert errors (e.g. FK violations) shouldn't be silently
-        reported as a clean success — that would advance the watermark past
-        data that never actually landed."""
+        """Row-level upsert errors mark PARTIAL_SUCCESS so the watermark holds."""
         run_row = object()
         mock_tracker = MockRunService.return_value
         mock_tracker.start_run = AsyncMock(return_value=run_row)
@@ -184,12 +209,7 @@ class TestBaseIngestorWorkflow:
     async def test_no_watermark_returns_none_start_for_full_pull(
         self, MockRunService, mocker, mock_client, mock_session
     ):
-        """With no prior run, start_date is None — a full historical pull.
-
-        A 1-day lookback would leave a newly-activated cycle's candidate
-        roster incomplete, causing FK violations when spending totals for
-        candidates outside that narrow window are ingested.
-        """
+        """With no prior run, start_date is None: a full historical pull."""
         MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
 
         fec_tz = ZoneInfo("America/New_York")
@@ -208,8 +228,7 @@ class TestBaseIngestorWorkflow:
         assert start is None
         assert end == "2025-06-15"
         mock_dt.now.assert_called_once_with(fec_tz)
-        # The watermark read must not leave the connection checked out
-        # across fetch()'s subsequent (potentially hours-long) FEC pull.
+        # Don't hold a connection open through the (possibly hours-long) fetch.
         mock_session.commit.assert_awaited_once()
 
     @patch("civic_lantern.jobs.base_ingestor.IngestionRunService", autospec=True)
@@ -274,12 +293,8 @@ class TestBaseIngestorWorkflow:
     async def test_failure_rolls_back_before_recording(
         self, MockRunService, mock_client, mock_session
     ):
-        """Session is rolled back before complete_run(status=FAILED).
-
-        Otherwise, if the failing exception left the session's transaction
-        aborted, complete_run's own commit() would raise too — masking the
-        original error and leaving the row stuck IN_PROGRESS.
-        """
+        """Rollback runs before complete_run(FAILED), so an aborted transaction
+        can't mask the original error."""
         MockRunService.return_value.start_run = AsyncMock(return_value=object())
         MockRunService.return_value.complete_run = AsyncMock()
 
@@ -350,9 +365,7 @@ class TestBaseIngestorWorkflow:
     async def test_cancellation_records_cancelled_status_and_reraises(
         self, MockRunService, mock_client, mock_session
     ):
-        """asyncio.CancelledError (e.g. from a SIGTERM-triggered task.cancel())
-        is recorded as CANCELLED, rolled back, and re-raised — not swallowed,
-        and not left stuck at IN_PROGRESS."""
+        """CancelledError is rolled back, recorded as CANCELLED and re-raised."""
         import asyncio
 
         run_row = object()
@@ -408,13 +421,7 @@ class TestBaseIngestorWorkflow:
     async def test_run_strips_date_kwargs_for_cycle_scoped_ingestors(
         self, MockRunService, mock_client, mock_session
     ):
-        """run() strips start_date/end_date before calling fetch() when a
-        cycle is present — cycle-scoped ingestors take no date window, but
-        run_nightly() invokes them through the same ingest_batch() path used
-        by date-windowed ingestors, which always forwards those kwargs
-        (usually None). Centralized here so individual cycle-scoped
-        ingestors don't each need to repeat the stripping.
-        """
+        """With a cycle, run() strips start_date/end_date before calling fetch()."""
         MockRunService.return_value.start_run = AsyncMock(return_value=object())
         MockRunService.return_value.complete_run = AsyncMock()
 
