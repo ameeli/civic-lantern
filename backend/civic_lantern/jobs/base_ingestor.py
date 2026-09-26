@@ -18,12 +18,11 @@ FEC_TIMEZONE = ZoneInfo("America/New_York")
 
 
 class BaseIngestor(ABC):
-    """Base class for FEC data ingestion.
+    """Shared fetch → transform → upsert workflow for FEC ingestion.
+    Subclasses supply entity_name, fetch, transform and create_service."""
 
-    Defines the shared fetch → transform → upsert workflow.
-    Subclasses implement entity_name, fetch, transform, and create_service
-    to plug in their specific FEC endpoint, Pydantic schema, and DB service.
-    """
+    # False when fetch() sums several FEC calls per row, so partial rows are wrong.
+    accepts_partial_fetch: bool = True
 
     def __init__(self, client: FECClient, session: AsyncSession):
         self.client = client
@@ -34,21 +33,13 @@ class BaseIngestor(ABC):
         self,
         **kwargs: Any,
     ) -> Optional[UpsertStats]:
-        """Execute the ingestion pipeline: fetch → transform → upsert.
-
-        Tracks the attempt in `ingestion_runs`, keyed by (entity_name, cycle).
-        `cycle` is None for date-windowed ingestors (candidates, committees)
-        and an int for the two cycle-scoped spending ingestors.
-        """
+        """Fetch → transform → upsert, tracked in `ingestion_runs` by (entity, cycle).
+        `cycle` is None for date-windowed ingestors, an int for cycle-scoped ones."""
         self.logger.info(f"Syncing {self.entity_name}")
 
         cycle = kwargs.get("cycle")
         if cycle is not None:
-            # Cycle-scoped ingestors take no date window — run_nightly()
-            # invokes them through the same ingest_batch() path used by
-            # date-windowed ingestors, which always forwards start_date/
-            # end_date (usually None). Stripping here once means individual
-            # cycle-scoped ingestors don't each need to repeat this.
+            # ingest_batch() always forwards dates; cycle-scoped fetch() takes none.
             kwargs.pop("start_date", None)
             kwargs.pop("end_date", None)
 
@@ -60,10 +51,10 @@ class BaseIngestor(ABC):
             try:
                 raw_data = await self.fetch(**kwargs)
             except PartialFetchError as e:
-                # Some pages failed even after retries. Don't discard the
-                # pages that did succeed — but the run can't be a clean
-                # SUCCESS, since resuming from a watermark set now would
-                # permanently skip whatever those pages held.
+                if not self.accepts_partial_fetch:
+                    raise
+                # Keep the pages that loaded, but as PARTIAL_SUCCESS so the
+                # watermark doesn't skip past what the failed pages held.
                 self.logger.warning(
                     f"{self.entity_name}: {e}; "
                     f"ingesting {len(e.results)} records fetched so far"
@@ -116,12 +107,8 @@ class BaseIngestor(ABC):
             )
             return stats
         except asyncio.CancelledError:
-            # SIGTERM (e.g. a cancelled GitHub Actions run) is translated
-            # into task cancellation by ingestion.py's signal handler, which
-            # raises CancelledError here instead of killing the process
-            # outright. Record it so the row doesn't stay IN_PROGRESS
-            # forever, then re-raise — swallowing cancellation breaks
-            # asyncio's cancellation contract for anything awaiting this.
+            # SIGTERM arrives as cancellation (see ingestion.py). Record it so the
+            # row isn't stuck IN_PROGRESS, then re-raise to honour cancellation.
             self.logger.warning(f"{self.entity_name} ingestion cancelled")
             await self.session.rollback()
             await run_tracker.complete_run(
@@ -134,10 +121,8 @@ class BaseIngestor(ABC):
             self.logger.error(
                 f"{self.entity_name} ingestion failed: {e}", exc_info=True
             )
-            # The exception may have left the session's transaction aborted
-            # (e.g. a bare commit() failing inside upsert_batch) — roll back
-            # first, or complete_run's own commit() would raise too, masking
-            # this error and leaving the row stuck IN_PROGRESS.
+            # Roll back first: an aborted transaction would make complete_run's
+            # commit raise too, masking this error and leaving the row IN_PROGRESS.
             await self.session.rollback()
             await run_tracker.complete_run(
                 run_row, status=IngestionRunStatus.FAILED, error_message=str(e)
@@ -168,15 +153,8 @@ class BaseIngestor(ABC):
     async def _resolve_dates(
         self, start_date: Optional[str], end_date: Optional[str]
     ) -> tuple[Optional[str], str]:
-        """Resume from the last successful run's watermark, in US/Eastern.
-
-        Returns `start_date=None` (no lower bound — a full historical pull)
-        when no prior successful run exists yet. A 1-day lookback would leave
-        a newly-activated cycle's candidate/committee roster incomplete,
-        causing downstream FK violations when spending totals for candidates
-        outside that narrow window are ingested. The full pull only happens
-        once; every subsequent run resumes from the watermark it sets.
-        """
+        """Resume from the last successful run's watermark (US/Eastern). With no
+        prior run, start_date is None: a full pull, so later FK lookups succeed."""
         now_et = datetime.now(FEC_TIMEZONE)
 
         if not end_date:

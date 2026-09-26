@@ -7,72 +7,33 @@ from civic_lantern.services.data.inside_totals_by_candidate import (
 )
 from civic_lantern.utils.transformers import transform_inside_totals_by_candidate
 
-# FEC's /candidates/totals/ only aggregates committees CURRENTLY designated
-# as a candidate's authorized/principal committee. When a committee is
-# redesignated after a campaign ends (e.g. converted to a leadership PAC),
-# its historical activity silently drops out of the candidate's totals even
-# though it was legitimately raised/spent as that candidate's committee at
-# the time.
-#
-# This is a manual, per-candidate stopgap for known cases, pending a general
-# fix that resolves a candidate's committees by historical linkage (see
-# /candidate/{id}/committees/history/) instead of current designation.
-# Remove each entry once that fix ships.
+# Committees /candidates/totals/ drops once redesignated after a campaign. Stopgap
+# until committees resolve via /candidate/{id}/committees/history/; then remove.
 KNOWN_COMMITTEE_OVERRIDES: Dict[tuple, List[str]] = {
-    # Trump's principal 2024 campaign committee was renamed "NEVER
-    # SURRENDER, INC." and redesignated a Leadership PAC after the
-    # election. Verified via /committee/C00828541/totals/: $495,853,270.30
-    # receipts / $471,501,651.83 disbursements for cycle 2024, absent from
-    # /candidates/P80001571/totals/.
+    # Trump's 2024 committee, now the "NEVER SURRENDER, INC." Leadership PAC:
+    # $495,853,270.30 receipts / $471,501,651.83 disbursements.
     ("P80001571", 2024): ["C00828541"],
-    # Harris's solo committee ("KAMALA HARRIS FOR THE PEOPLE"), separate
-    # from the C00703975 committee she shares with Biden (see
-    # KNOWN_COMMITTEE_SPLITS below). Her entire raw /candidates/totals/ row
-    # for 2024 is excluded by _exclude_split_candidates (it's the shared
-    # committee's duplicated total), so this committee's own activity must
-    # be patched back in here or it silently disappears. Verified via
-    # /committee/C00694455/totals/: $0 receipts / $69,741.02 disbursements
-    # for cycle 2024.
+    # Harris's solo committee; the split below excludes her raw row, so add it
+    # back here: $0 receipts / $69,741.02 disbursements.
     ("P00009423", 2024): ["C00694455"],
 }
 
-# FEC's /candidates/totals/ attributes a committee's FULL cycle total to
-# EVERY candidate_id it has ever been linked to in that cycle (its
-# candidate_ids array keeps historical entries) — when a committee is
-# redesignated from one candidate to another mid-cycle, both candidates get
-# the entire amount, double-counting it.
-#
-# This is a manual, per-committee stopgap for known cases. Each entry's
-# `before_candidate_id`/`after_candidate_id` rows are excluded from the raw
-# /candidates/totals/ fetch (see _exclude_split_candidates) and replaced
-# with per-period totals computed from the committee's own /reports/
-# endpoint, apportioned at `split_date` (see _fetch_splits). Supports
-# exactly one split date per committee/cycle between two candidates — not a
-# generalized N-way split — since that's the only known case today.
+# Committees redesignated mid-cycle, whose full total FEC gives both candidates.
+# Their raw rows are replaced by /reports/ totals split at split_date (one split).
 KNOWN_COMMITTEE_SPLITS: Dict[tuple, Dict[str, Any]] = {
     ("C00703975", 2024): {
         "before_candidate_id": "P80000722",  # Joseph Biden
         "after_candidate_id": "P00009423",  # Kamala Harris
-        # First day attributed to after_candidate_id. Committee was
-        # registered as "Biden for President", redesignated "Harris for
-        # President" the day Biden withdrew and endorsed Harris, per FEC
-        # Statement of Organization amendment (file_number 1805326)
-        # timestamped 2024-07-21 — the best available authoritative signal
-        # for an effective date (FEC has no structured "effective date"
-        # field for redesignations). Renamed again post-election to
-        # "Fight for the People PAC"; irrelevant here since only the
-        # 2024-cycle activity is attributed.
+        # First Harris day: redesignation per FEC Statement of Organization
+        # amendment file_number 1805326 (FEC has no effective-date field).
         "split_date": date(2024, 7, 21),
     },
 }
 
 
 class CommitteeSplitDataError(RuntimeError):
-    """Raised when a KNOWN_COMMITTEE_SPLITS entry's committee doesn't return
-    usable report data for a cycle (e.g. zero reports, or none flagged
-    most_recent). Raised rather than silently falling back to zero-value
-    rows, which would look like valid data and could clobber good
-    historical rows on a re-run."""
+    """A split committee returned no most_recent reports; raised rather than
+    writing zero rows over good data."""
 
 
 class InsideTotalsByCandidateIngestor(BaseIngestor):
@@ -80,9 +41,10 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "inside_totals_by_candidate"
 
-    # IngestionManager always threads a matching `cycle` kwarg for this
-    # cycle-scoped ingestor, so narrowing the base class's fully-generic
-    # **kwargs signature is safe in practice.
+    # Rows sum several FEC calls, so a partial fetch would write wrong totals.
+    accepts_partial_fetch = False
+
+    # Narrower than the base **kwargs; IngestionManager always passes `cycle`.
     async def fetch(  # type: ignore[override]
         self, cycle: int, **kwargs: Any
     ) -> List[Dict[str, Any]]:
@@ -96,9 +58,7 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
     def _exclude_split_candidates(
         self, raw: List[Dict[str, Any]], cycle: int
     ) -> List[Dict[str, Any]]:
-        """Strip FEC's own (duplicated) rows for candidates covered by
-        KNOWN_COMMITTEE_SPLITS in this cycle, so _fetch_splits's computed
-        rows are the only source of truth for those candidate_ids."""
+        """Drop FEC's duplicated split-candidate rows; _fetch_splits replaces them."""
         excluded_ids = {
             candidate_id
             for (_, split_cycle), split in KNOWN_COMMITTEE_SPLITS.items()
@@ -122,18 +82,8 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
         return filtered
 
     async def _fetch_splits(self, cycle: int) -> List[Dict[str, Any]]:
-        """Patch in per-candidate totals for committees redesignated mid-cycle
-        between two candidates, which FEC's own totals endpoint
-        double-counts. See KNOWN_COMMITTEE_SPLITS.
-
-        Fetches each configured committee's periodic /reports/, keeps only
-        the most_recent version of each coverage period, buckets whole
-        periods before/after split_date, and prorates the one period that
-        straddles split_date by calendar day count. Emits two synthetic
-        rows shaped like /candidates/totals/ output, one per candidate, so
-        the existing transform's per-(candidate_id, cycle) summation picks
-        them up exactly like _fetch_overrides's rows.
-        """
+        """One row per split candidate from most_recent /reports/, bucketed at
+        split_date with the straddling period prorated by day."""
         rows: List[Dict[str, Any]] = []
         for (committee_id, split_cycle), split in KNOWN_COMMITTEE_SPLITS.items():
             if split_cycle != cycle:
@@ -147,10 +97,7 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
                     f"{committee_id} cycle {cycle}; refusing to guess totals."
                 )
 
-            # Defensive dedupe: keep first most_recent row per coverage
-            # period, warn if FEC ever marks more than one as most_recent
-            # for the same period (shouldn't happen, but don't silently
-            # double-sum if it does).
+            # Keep the first most_recent report per period so none is summed twice.
             by_period: Dict[tuple, Dict[str, Any]] = {}
             for r in authoritative:
                 key = (r.get("coverage_start_date"), r.get("coverage_end_date"))
@@ -217,14 +164,8 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
         return rows
 
     async def _fetch_overrides(self, cycle: int) -> List[Dict[str, Any]]:
-        """Patch in committees FEC's candidate-totals endpoint has dropped
-        after a post-campaign redesignation. See KNOWN_COMMITTEE_OVERRIDES.
-
-        Synthesizes rows shaped like /candidates/totals/ output (just
-        candidate_id/cycle/receipts/disbursements) so the existing
-        transform's per-(candidate_id, cycle) accumulation picks them up
-        and sums them alongside whatever FEC's own endpoint still returns.
-        """
+        """Rows shaped like /candidates/totals/ for KNOWN_COMMITTEE_OVERRIDES,
+        which the transform sums with FEC's own row for that candidate."""
         rows: List[Dict[str, Any]] = []
         for (
             candidate_id,
