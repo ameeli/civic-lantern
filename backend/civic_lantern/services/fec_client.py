@@ -103,7 +103,8 @@ class FECClient:
             ) from e
 
     async def _paginate(self, url: str, base_params: dict) -> List[Dict[str, Any]]:
-        """Parallel pagination with a real-time progress bar."""
+        """Parallel pagination with a real-time progress bar. Pages are fetched
+        concurrently, so base_params needs a `sort` that uniquely orders rows."""
         p1_data = await self._fetch_page(url, {**base_params, "page": 1})
         results = p1_data.get("results", [])
 
@@ -166,6 +167,7 @@ class FECClient:
             "api_key": self.api_key,
             "per_page": per_page,
             "office": office,
+            "sort": "candidate_id",
         }
         params.update(kwargs)
 
@@ -177,6 +179,7 @@ class FECClient:
         params = {
             "api_key": self.api_key,
             "per_page": per_page,
+            "sort": "committee_id",
         }
         params.update(kwargs)
 
@@ -267,6 +270,8 @@ class FECClient:
             "cycle": cycle,
             "per_page": per_page,
             "office": office,
+            # Rows are unique per (candidate_id, support_oppose_indicator) in a cycle.
+            "sort": ["candidate_id", "support_oppose_indicator"],
             **kwargs,
         }
 

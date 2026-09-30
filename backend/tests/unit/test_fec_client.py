@@ -218,6 +218,48 @@ class TestFECClientGetCommitteeReports:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+class TestFECClientStableSort:
+    """Pages are fetched in parallel, so every request needs a sort that
+    uniquely orders rows, or rows can shift between pages."""
+
+    @pytest.mark.parametrize(
+        "method, kwargs, url_attr, expected_sort",
+        [
+            ("get_candidates", {}, "candidate_url", ["candidate_id"]),
+            ("get_committees", {}, "committee_url", ["committee_id"]),
+            (
+                "get_candidate_totals",
+                {"cycle": 2024},
+                "candidate_totals_url",
+                ["candidate_id"],
+            ),
+            (
+                "get_candidate_schedule_e_totals",
+                {"cycle": 2024},
+                "schedule_e_totals_by_candidate_url",
+                ["candidate_id", "support_oppose_indicator"],
+            ),
+        ],
+    )
+    @respx.mock
+    async def test_every_page_request_sets_unique_sort(
+        self, client, method, kwargs, url_attr, expected_sort
+    ):
+        route = respx.get(url__startswith=getattr(client, url_attr)).mock(
+            return_value=httpx.Response(
+                200, json={"results": [{"id": 1}], "pagination": {"pages": 3}}
+            )
+        )
+
+        await getattr(client, method)(**kwargs)
+
+        assert len(route.calls) == 3
+        for call in route.calls:
+            assert call.request.url.params.get_list("sort") == expected_sort
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 class TestFECClientRateLimiting:
     """Test that both rate limiters are acquired on every request."""
 
