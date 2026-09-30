@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     DATABASE_URL_ASYNC: str
-    TEST_DATABASE_URL_ASYNC: str
+    # Only the test suite needs this; deployed jobs must never be given one.
+    TEST_DATABASE_URL_ASYNC: str | None = None
     FEC_API_KEY: str | None = None
     ALLOWED_ORIGINS: str = "http://localhost:3000"
 

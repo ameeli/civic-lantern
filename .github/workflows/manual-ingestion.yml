@@ -18,7 +18,6 @@ jobs:
         working-directory: backend
     env:
       DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
-      TEST_DATABASE_URL_ASYNC: ${{ secrets.DATABASE_URL_ASYNC }}
       FEC_API_KEY: ${{ secrets.FEC_API_KEY }}
     steps:
       - uses: actions/checkout@v7

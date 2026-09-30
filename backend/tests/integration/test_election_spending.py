@@ -8,7 +8,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from civic_lantern.core.config import get_settings
 from civic_lantern.db.models import Base
 from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
@@ -21,17 +20,17 @@ MV_CANDIDATE_SQL = """
     CREATE MATERIALIZED VIEW mv_candidate_spending_summary AS
     WITH inside AS (
         SELECT candidate_id, cycle,
-               SUM(receipts)      AS inside_receipts,
-               SUM(disbursements) AS inside_disbursements
+            SUM(receipts)      AS inside_receipts,
+            SUM(disbursements) AS inside_disbursements
         FROM inside_totals_by_candidate
         GROUP BY candidate_id, cycle
     ),
     outside AS (
         SELECT candidate_id, cycle,
-               SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END)
-                   AS outside_support,
-               SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END)
-                   AS outside_oppose
+            SUM(CASE WHEN support_oppose_indicator = 'S' THEN total ELSE 0 END)
+                AS outside_support,
+            SUM(CASE WHEN support_oppose_indicator = 'O' THEN total ELSE 0 END)
+                AS outside_oppose
         FROM schedule_e_totals_by_candidate
         GROUP BY candidate_id, cycle
     ),
@@ -84,11 +83,8 @@ MV_ELECTION_INDEX_SQL = """
 
 
 @pytest_asyncio.fixture
-async def db_with_mv():
-    settings = get_settings()
-    engine = create_async_engine(
-        settings.TEST_DATABASE_URL_ASYNC, echo=False, poolclass=NullPool
-    )
+async def db_with_mv(test_database_url):
+    engine = create_async_engine(test_database_url, echo=False, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(text(MV_CANDIDATE_SQL))

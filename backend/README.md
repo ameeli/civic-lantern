@@ -95,7 +95,7 @@ pydantic-settings model) and loaded from `backend/.env`. `get_settings()` is
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL_ASYNC` | yes | Async (asyncpg) connection string used by the app |
-| `TEST_DATABASE_URL_ASYNC` | yes | Async connection string for integration tests |
+| `TEST_DATABASE_URL_ASYNC` | tests only | Async connection string for integration tests; never set it in deployed jobs |
 | `FEC_API_KEY` | no (needed for ingestion) | API key for api.open.fec.gov, sent as an `api_key` query param |
 | `ENVIRONMENT` | no (default `development`) | Environment label |
 | `DEBUG` | no (default `True`) | Debug flag |

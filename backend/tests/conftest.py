@@ -11,11 +11,17 @@ from civic_lantern.db.models import Base
 from civic_lantern.services.fec_client import FECClient
 
 
-@pytest_asyncio.fixture
-async def async_db():
-    settings = get_settings()
+@pytest.fixture(scope="session")
+def test_database_url() -> str:
+    url = get_settings().TEST_DATABASE_URL_ASYNC
+    if not url:
+        pytest.fail("TEST_DATABASE_URL_ASYNC must be set to run integration tests")
+    return url
 
-    engine = create_async_engine(settings.TEST_DATABASE_URL_ASYNC, echo=False)
+
+@pytest_asyncio.fixture
+async def async_db(test_database_url):
+    engine = create_async_engine(test_database_url, echo=False)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
