@@ -41,6 +41,8 @@ async def client():
     so retry/pagination tests run at full speed (see TestFECClientRateLimiting).
     """
     async with FECClient(show_progress=False) as client:
+        # FEC_API_KEY is optional in settings; pin one so tests don't depend on env.
+        client.api_key = "test-api-key"
         client.limiter = AsyncLimiter(max_rate=10000, time_period=1)
         client.minute_limiter = AsyncLimiter(max_rate=10000, time_period=1)
         yield client
