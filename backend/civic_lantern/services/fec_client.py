@@ -193,7 +193,7 @@ class FECClient:
         """Fetch a single committee's own totals, keyed by committee_id
         rather than candidate_id. Used to patch in committees that FEC's
         candidate-totals endpoint no longer associates with a candidate
-        (see inside_totals_by_candidate.py's KNOWN_COMMITTEE_OVERRIDES)."""
+        (see committee_corrections.py's KNOWN_COMMITTEE_OVERRIDES)."""
         params = {"api_key": self.api_key, "per_page": per_page, **kwargs}
         url = self.committee_totals_url_tpl.format(committee_id=committee_id)
 
@@ -210,7 +210,7 @@ class FECClient:
         scoped to a coverage period with period-specific totals rather than
         totals cumulative to-date. Used to apportion a redesignated
         committee's activity between two candidate_ids it's shared across a
-        split date (see inside_totals_by_candidate.py's
+        split date (see committee_corrections.py's
         KNOWN_COMMITTEE_SPLITS).
 
         A coverage period may appear multiple times if amended. FEC flags
