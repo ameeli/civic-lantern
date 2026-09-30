@@ -1,10 +1,11 @@
 import asyncio
 import logging
-from typing import Any, Dict, List, NoReturn
+from dataclasses import dataclass, field
+from string import Formatter
+from typing import Any, Dict, List, Mapping, NoReturn, Tuple
 
 import httpx
 from aiolimiter import AsyncLimiter
-from tqdm import tqdm
 from tqdm.asyncio import tqdm_asyncio
 
 from civic_lantern.core.config import get_settings
@@ -25,30 +26,68 @@ from civic_lantern.services.http_utils import fec_retry
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+FEDERAL_OFFICES = ("P", "S", "H")
+PER_PAGE = 100
+
+
+@dataclass(frozen=True, eq=False)
+class FECEndpoint:
+    """One paginated FEC endpoint, described as data by the module that uses it."""
+
+    name: str
+    # Relative to BASE_URL; {placeholders} are filled from fetch_all's params.
+    path: str
+    # Must order rows uniquely: pages are fetched in parallel, so ties can shift rows.
+    sort: Tuple[str, ...]
+    params: Mapping[str, Any] = field(default_factory=dict)
+    required: Tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.sort:
+            raise ValueError(f"FEC endpoint {self.name!r} needs a sort key")
+
 
 class FECClient:
     BASE_URL = "https://api.open.fec.gov/v1"
 
-    def __init__(self):
+    def __init__(self, show_progress: bool = True):
         self.base_url = self.BASE_URL
-        self.candidate_url = f"{self.base_url}/candidates/"
-        self.candidate_totals_url = f"{self.base_url}/candidates/totals/"
-        self.committee_url = f"{self.base_url}/committees/"
-        self.committee_totals_url_tpl = (
-            f"{self.base_url}/committee/{{committee_id}}/totals/"
-        )
-        self.committee_reports_url_tpl = (
-            f"{self.base_url}/committee/{{committee_id}}/reports/"
-        )
-        self.schedule_e_totals_by_candidate_url = (
-            f"{self.base_url}/schedules/schedule_e/totals/by_candidate/"
-        )
+        self.show_progress = show_progress
         self.api_key = settings.FEC_API_KEY
         self.client = httpx.AsyncClient(timeout=30.0)
         self.limiter = AsyncLimiter(max_rate=900, time_period=3600)
         # The FEC API has an undocumented per-minute burst limit
         # max_rate=1 allows 60 req/min.
         self.minute_limiter = AsyncLimiter(max_rate=1, time_period=1)
+
+    async def fetch_all(
+        self, endpoint: FECEndpoint, **params: Any
+    ) -> List[Dict[str, Any]]:
+        """Fetch every row of `endpoint` across all pages.
+
+        Params naming a {placeholder} in endpoint.path fill it; the rest are
+        query params. The client owns api_key, per_page and sort. Raises
+        PartialFetchError, carrying the rows fetched, if pages fail after retries.
+        """
+        owned = {"api_key", "sort"} & params.keys()
+        if owned:
+            raise ValueError(f"{sorted(owned)} are set by FECClient, not callers")
+        placeholders = {f for _, f, _, _ in Formatter().parse(endpoint.path) if f}
+        missing = [k for k in (*placeholders, *endpoint.required) if k not in params]
+        if missing:
+            raise TypeError(f"FEC endpoint {endpoint.name!r} needs {missing}")
+
+        path = endpoint.path.format(**{k: params.pop(k) for k in placeholders})
+        query = {
+            "api_key": self.api_key,
+            "per_page": PER_PAGE,
+            **endpoint.params,
+            **params,
+            "sort": list(endpoint.sort),
+        }
+        rows = await self._paginate(f"{self.base_url}{path}", query, endpoint.name)
+        logger.info(f"✅ Fetched {len(rows)} {endpoint.name} row(s) from {path}")
+        return rows
 
     @fec_retry
     async def _fetch_page(self, url: str, params: dict) -> dict:
@@ -102,9 +141,10 @@ class FECClient:
                 f"HTTP {status} error", status_code=status, response=response
             ) from e
 
-    async def _paginate(self, url: str, base_params: dict) -> List[Dict[str, Any]]:
-        """Parallel pagination with a real-time progress bar. Pages are fetched
-        concurrently, so base_params needs a `sort` that uniquely orders rows."""
+    async def _paginate(
+        self, url: str, base_params: dict, label: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch page 1, then the remaining pages concurrently."""
         p1_data = await self._fetch_page(url, {**base_params, "page": 1})
         results = p1_data.get("results", [])
 
@@ -119,29 +159,28 @@ class FECClient:
             for p in range(2, last_page + 1)
         ]
 
-        endpoint_name = url.rstrip("/").split("?")[0].split("/")[-1] or "data"
-        responses = await tqdm_asyncio.gather(
-            *tasks,
-            desc=f"Fetching {endpoint_name}",
-            unit="page",
-        )
+        if self.show_progress:
+            responses = await tqdm_asyncio.gather(
+                *tasks, desc=f"Fetching {label}", unit="page"
+            )
+        else:
+            responses = await asyncio.gather(*tasks)
 
         failed_pages = []
         for i, resp in enumerate(responses):
             if isinstance(resp, Exception):
-                tqdm.write(f"❌ Page {i + 2} failed: {resp}")
                 failed_pages.append(i + 2)
                 continue
             results.extend(resp.get("results", []))
 
         if failed_pages:
             logger.warning(
-                f"Partial results for {endpoint_name}: "
+                f"Partial results for {label}: "
                 f"{len(failed_pages)}/{last_page} pages failed "
                 f"(pages {failed_pages}). {len(results)} records returned."
             )
             raise PartialFetchError(
-                f"{len(failed_pages)}/{last_page} pages failed for {endpoint_name}",
+                f"{len(failed_pages)}/{last_page} pages failed for {label}",
                 results=results,
                 failed_pages=failed_pages,
             )
@@ -157,127 +196,6 @@ class FECClient:
             except Exception as e:
                 logger.warning(f"Page {page} failed: {e}")
                 return e
-
-    FEDERAL_OFFICES = ["P", "S", "H"]
-
-    async def get_candidates(
-        self, per_page: int = 100, office: list[str] = FEDERAL_OFFICES, **kwargs
-    ) -> list[dict]:
-        params = {
-            "api_key": self.api_key,
-            "per_page": per_page,
-            "office": office,
-            "sort": "candidate_id",
-        }
-        params.update(kwargs)
-
-        candidates = await self._paginate(self.candidate_url, params)
-        logger.info(f"✅ Fetched {len(candidates)} candidates")
-        return candidates
-
-    async def get_committees(self, per_page: int = 100, **kwargs) -> list[dict]:
-        params = {
-            "api_key": self.api_key,
-            "per_page": per_page,
-            "sort": "committee_id",
-        }
-        params.update(kwargs)
-
-        committees = await self._paginate(self.committee_url, params)
-        logger.info(f"✅ Fetched {len(committees)} committees")
-        return committees
-
-    async def get_committee_totals(
-        self, committee_id: str, per_page: int = 100, **kwargs
-    ) -> list[dict]:
-        """Fetch a single committee's own totals, keyed by committee_id
-        rather than candidate_id. Used to patch in committees that FEC's
-        candidate-totals endpoint no longer associates with a candidate
-        (see committee_corrections.py's KNOWN_COMMITTEE_OVERRIDES)."""
-        params = {"api_key": self.api_key, "per_page": per_page, **kwargs}
-        url = self.committee_totals_url_tpl.format(committee_id=committee_id)
-
-        totals = await self._paginate(url, params)
-        logger.info(
-            f"✅ Fetched {len(totals)} totals row(s) for committee {committee_id}"
-        )
-        return totals
-
-    async def get_committee_reports(
-        self, committee_id: str, cycle: int, per_page: int = 100, **kwargs
-    ) -> list[dict]:
-        """Fetch a committee's periodic filed reports (e.g. Form 3P), each
-        scoped to a coverage period with period-specific totals rather than
-        totals cumulative to-date. Used to apportion a redesignated
-        committee's activity between two candidate_ids it's shared across a
-        split date (see committee_corrections.py's
-        KNOWN_COMMITTEE_SPLITS).
-
-        A coverage period may appear multiple times if amended. FEC flags
-        exactly one row per (coverage_start_date, coverage_end_date) as
-        `most_recent: true` — callers must filter on that flag to avoid
-        double-counting superseded versions; this method returns raw rows
-        unfiltered.
-        """
-        params = {
-            "api_key": self.api_key,
-            "cycle": cycle,
-            "per_page": per_page,
-            "sort": "coverage_start_date",
-            **kwargs,
-        }
-        url = self.committee_reports_url_tpl.format(committee_id=committee_id)
-
-        reports = await self._paginate(url, params)
-        logger.info(
-            f"✅ Fetched {len(reports)} report row(s) for committee "
-            f"{committee_id} cycle {cycle}"
-        )
-        return reports
-
-    async def get_candidate_totals(
-        self,
-        cycle: int,
-        per_page: int = 100,
-        office: list[str] = FEDERAL_OFFICES,
-        **kwargs,
-    ) -> list[dict]:
-        """Fetch inside spending totals for candidates."""
-        params = {
-            "api_key": self.api_key,
-            "cycle": cycle,
-            "election_full": "false",
-            "per_page": per_page,
-            "office": office,
-            "sort": "candidate_id",
-            **kwargs,
-        }
-
-        totals = await self._paginate(self.candidate_totals_url, params)
-        logger.info(f"✅ Fetched {len(totals)} inside candidate totals")
-        return totals
-
-    async def get_candidate_schedule_e_totals(
-        self,
-        cycle: int,
-        per_page: int = 100,
-        office: list[str] = FEDERAL_OFFICES,
-        **kwargs,
-    ) -> list[dict]:
-        """Fetch independent expenditures aggregated by candidate."""
-        params = {
-            "api_key": self.api_key,
-            "cycle": cycle,
-            "per_page": per_page,
-            "office": office,
-            # Rows are unique per (candidate_id, support_oppose_indicator) in a cycle.
-            "sort": ["candidate_id", "support_oppose_indicator"],
-            **kwargs,
-        }
-
-        totals = await self._paginate(self.schedule_e_totals_by_candidate_url, params)
-        logger.info(f"✅ Fetched {len(totals)} candidate schedule E totals")
-        return totals
 
     async def __aenter__(self):
         return self

@@ -2,7 +2,15 @@ from typing import Any, Dict, List, Optional
 
 from civic_lantern.jobs.base_ingestor import BaseIngestor
 from civic_lantern.services.data.candidate import CandidateService
+from civic_lantern.services.fec_client import FEDERAL_OFFICES, FECEndpoint
 from civic_lantern.utils.transformers import transform_candidates
+
+CANDIDATES = FECEndpoint(
+    name="candidates",
+    path="/candidates/",
+    sort=("candidate_id",),
+    params={"office": FEDERAL_OFFICES},
+)
 
 
 class CandidateIngestor(BaseIngestor):
@@ -27,7 +35,7 @@ class CandidateIngestor(BaseIngestor):
         if start_date:
             kwargs["min_first_file_date"] = start_date
         kwargs["max_first_file_date"] = end_date
-        return await self.client.get_candidates(**kwargs)
+        return await self.client.fetch_all(CANDIDATES, **kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
         """Validate raw candidate dicts through CandidateIn schema."""

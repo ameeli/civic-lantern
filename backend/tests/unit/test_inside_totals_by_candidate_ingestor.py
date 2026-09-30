@@ -3,9 +3,11 @@ from unittest.mock import patch
 import pytest
 
 from civic_lantern.jobs.ingestors.inside_totals_by_candidate import (
+    CANDIDATE_TOTALS,
     InsideTotalsByCandidateIngestor,
 )
 from civic_lantern.services.committee_corrections import (
+    COMMITTEE_TOTALS,
     CommitteeCorrections,
     CommitteeOverride,
 )
@@ -23,23 +25,26 @@ def _ingestor(mock_client, mock_session, corrections=None):
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestInsideTotalsByCandidateIngestor:
-    async def test_fetch_calls_get_candidate_totals(self, mock_client, mock_session):
-        """fetch() delegates to client.get_candidate_totals with the cycle."""
-        mock_client.get_candidate_totals.return_value = [
-            {"candidate_id": "P001", "cycle": 2022}
-        ]
+    async def test_fetch_requests_candidate_totals_endpoint(
+        self, mock_client, mock_session
+    ):
+        """fetch() requests the candidate totals endpoint for the cycle."""
+        mock_client.fetch_all.return_value = [{"candidate_id": "P001", "cycle": 2022}]
 
         result = await _ingestor(mock_client, mock_session).fetch(cycle=2022)
 
-        mock_client.get_candidate_totals.assert_awaited_once_with(cycle=2022)
+        mock_client.fetch_all.assert_awaited_once_with(CANDIDATE_TOTALS, cycle=2022)
         assert result == [{"candidate_id": "P001", "cycle": 2022}]
 
     async def test_fetch_applies_committee_corrections(self, mock_client, mock_session):
         """fetch() returns FEC's rows with the cycle's corrections applied."""
-        mock_client.get_candidate_totals.return_value = [
-            {"candidate_id": "P001", "cycle": 2024, "receipts": 100}
-        ]
-        mock_client.get_committee_totals.return_value = [{"receipts": 50}]
+        responses = {
+            CANDIDATE_TOTALS: [
+                {"candidate_id": "P001", "cycle": 2024, "receipts": 100}
+            ],
+            COMMITTEE_TOTALS: [{"receipts": 50}],
+        }
+        mock_client.fetch_all.side_effect = lambda endpoint, **_: responses[endpoint]
         corrections = CommitteeCorrections(
             overrides=(CommitteeOverride("P001", 2024, "C001"),), splits=()
         )
@@ -48,7 +53,9 @@ class TestInsideTotalsByCandidateIngestor:
             cycle=2024
         )
 
-        mock_client.get_committee_totals.assert_awaited_once_with("C001", cycle=2024)
+        mock_client.fetch_all.assert_any_await(
+            COMMITTEE_TOTALS, committee_id="C001", cycle=2024
+        )
         assert result == [
             {"candidate_id": "P001", "cycle": 2024, "receipts": 100},
             {

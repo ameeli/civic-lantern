@@ -5,7 +5,16 @@ from civic_lantern.services.committee_corrections import CommitteeCorrections
 from civic_lantern.services.data.inside_totals_by_candidate import (
     InsideTotalsByCandidateService,
 )
+from civic_lantern.services.fec_client import FEDERAL_OFFICES, FECEndpoint
 from civic_lantern.utils.transformers import transform_inside_totals_by_candidate
+
+CANDIDATE_TOTALS = FECEndpoint(
+    name="candidate totals",
+    path="/candidates/totals/",
+    sort=("candidate_id",),
+    params={"election_full": "false", "office": FEDERAL_OFFICES},
+    required=("cycle",),
+)
 
 
 class InsideTotalsByCandidateIngestor(BaseIngestor):
@@ -24,7 +33,7 @@ class InsideTotalsByCandidateIngestor(BaseIngestor):
     ) -> List[Dict[str, Any]]:
         """Fetch inside spending totals for all candidates in the given cycle,
         with committee corrections applied."""
-        raw = await self.client.get_candidate_totals(cycle=cycle, **kwargs)
+        raw = await self.client.fetch_all(CANDIDATE_TOTALS, cycle=cycle, **kwargs)
         inputs = await self.corrections.fetch_inputs(self.client, cycle)
         return self.corrections.apply(raw, cycle, inputs)
 
