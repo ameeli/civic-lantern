@@ -22,6 +22,8 @@ SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
 # several hours under the FEC 900/hr rate limit. Still self-heals well
 # before the next night's scheduled trigger.
 OVERLAP_TIMEOUT_MINUTES = 720
+# Result key for a failed MV refresh, so the CLI counts it as a failure.
+MV_REFRESH_RESULT_KEY = "refresh_spending_stats"
 
 
 class IngestionManager:
@@ -113,7 +115,7 @@ class IngestionManager:
             results.get(name) and "error" not in results.get(name, {}) for name in ran
         )
         if any_succeeded and not skip_mv_refresh:
-            await self.refresh_spending_stats()
+            await self._refresh_recording_errors(results)
 
         return results
 
@@ -150,7 +152,7 @@ class IngestionManager:
         # span every cycle, so refreshing after each is redundant work that
         # grows every time another cycle becomes active.
         if any_spending_succeeded:
-            await self.refresh_spending_stats()
+            await self._refresh_recording_errors(results)
 
         return results
 
@@ -159,26 +161,29 @@ class IngestionManager:
 
         mv_candidate_spending_summary must be refreshed before
         mv_election_spending_summary since the latter sources from the former.
-        CONCURRENTLY allows reads to continue during each refresh.
+        CONCURRENTLY allows reads to continue during each refresh. Raises on
+        failure; closing the session rolls back.
         """
         async with JobSessionLocal() as session:
-            try:
-                await session.execute(
-                    text(
-                        "REFRESH MATERIALIZED VIEW CONCURRENTLY "
-                        "mv_candidate_spending_summary"
-                    )
+            await session.execute(
+                text(
+                    "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+                    "mv_candidate_spending_summary"
                 )
-                await session.execute(
-                    text(
-                        "REFRESH MATERIALIZED VIEW CONCURRENTLY "
-                        "mv_election_spending_summary"
-                    )
+            )
+            await session.execute(
+                text(
+                    "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+                    "mv_election_spending_summary"
                 )
-                await session.commit()
-                logger.info("✅ Materialized views refreshed.")
-            except Exception as e:
-                logger.error(
-                    f"Failed to refresh materialized views: {e}", exc_info=True
-                )
-                await session.rollback()
+            )
+            await session.commit()
+            logger.info("✅ Materialized views refreshed.")
+
+    async def _refresh_recording_errors(self, results: Dict[str, Any]) -> None:
+        """Refresh the MVs, recording a failure in `results` instead of raising."""
+        try:
+            await self.refresh_spending_stats()
+        except Exception as e:
+            logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
+            results[MV_REFRESH_RESULT_KEY] = {"error": str(e)}

@@ -5,6 +5,7 @@ from sqlalchemy import TextClause
 
 from civic_lantern.jobs.manager import (
     DATE_WINDOWED_ENTITIES,
+    MV_REFRESH_RESULT_KEY,
     OVERLAP_TIMEOUT_MINUTES,
     SPENDING_ENTITIES,
     IngestionManager,
@@ -149,6 +150,35 @@ class TestIngestionManager:
         mock_refresh.assert_awaited_once()
 
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
+    async def test_refresh_spending_stats_raises_on_failure(self, MockSession, manager):
+        """A failed refresh propagates instead of being swallowed."""
+        mock_session = AsyncMock()
+        mock_session.execute.side_effect = RuntimeError("lock timeout")
+        MockSession.return_value.__aenter__.return_value = mock_session
+
+        with pytest.raises(RuntimeError, match="lock timeout"):
+            await manager.refresh_spending_stats()
+
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
+    async def test_ingest_batch_records_mv_refresh_failure(self, MockSession, manager):
+        """A failed refresh is recorded as an error result, so the CLI exits 1."""
+        mock_ingestor = MagicMock()
+        mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
+        registry = {"inside_totals_by_candidate": mock_ingestor}
+
+        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
+            with patch.object(
+                manager,
+                "refresh_spending_stats",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("lock timeout"),
+            ):
+                results = await manager.ingest_batch()
+
+        assert results["inside_totals_by_candidate"] == {"inserted": 1}
+        assert results[MV_REFRESH_RESULT_KEY] == {"error": "lock timeout"}
+
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
         self, MockSession, manager
     ):
@@ -267,6 +297,31 @@ class TestRunNightly:
                     await manager.run_nightly()
 
         mock_refresh.assert_awaited_once()
+
+    @patch("civic_lantern.jobs.manager.JobSessionLocal")
+    @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
+    async def test_run_nightly_records_mv_refresh_failure(
+        self, MockRunService, MockSession, manager
+    ):
+        """A failed nightly refresh is recorded as an error, so the CLI exits 1."""
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        MockRunService.return_value.has_active_run = AsyncMock(return_value=False)
+        MockRunService.return_value.reset_stale_runs = AsyncMock()
+
+        async def fake_ingest_batch(entities, *args, **kwargs):
+            return {name: {"inserted": 1} for name in entities}
+
+        with patch.object(manager, "ingest_batch", side_effect=fake_ingest_batch):
+            with patch("civic_lantern.jobs.manager.active_cycles", return_value=[2024]):
+                with patch.object(
+                    manager,
+                    "refresh_spending_stats",
+                    new_callable=AsyncMock,
+                    side_effect=RuntimeError("lock timeout"),
+                ):
+                    results = await manager.run_nightly()
+
+        assert results[MV_REFRESH_RESULT_KEY] == {"error": "lock timeout"}
 
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
     @patch("civic_lantern.jobs.manager.IngestionRunService", autospec=True)
