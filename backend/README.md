@@ -181,8 +181,11 @@ the ingestion pipeline only.
    API (`https://api.open.fec.gov/v1`), authenticating via `FEC_API_KEY` as a
    query param. It applies two rate limiters (900 req/hour, ~60 req/min) and
    retries retryable errors (server errors, timeouts, network errors) with
-   exponential backoff (2s–600s, 3 attempts).
-2. Each ingestor in `jobs/ingestors/` calls one client method, transforms the
+   exponential backoff (2s–600s, 3 attempts). Its one public method,
+   `fetch_all(endpoint, **params)`, fetches every page of an `FECEndpoint`.
+2. Each ingestor in `jobs/ingestors/` declares the `FECEndpoint` it reads
+   (path, a sort key that uniquely orders rows, fixed params) next to its
+   code, and passes it to `fetch_all`. It then transforms the
    raw JSON through a Pydantic schema (`utils/transformers.py`, invalid/
    duplicate records are logged and skipped), and upserts via its
    `services/data/*Service` (`INSERT ... ON CONFLICT DO UPDATE`, batched with
@@ -201,24 +204,18 @@ the ingestion pipeline only.
 | `InsideTotalsByCandidateIngestor` | `/v1/candidates/totals/` (summed across primary+general) | `inside_totals_by_candidate` |
 | `ScheduleETotalsByCandidateIngestor` | Schedule E independent-expenditure totals | `schedule_e_totals_by_candidate` |
 
-**Running ingestion:** there is currently no CLI or scheduled job. The only
-entrypoint is `civic_lantern/jobs/ingestion.py`'s `if __name__ == "__main__"`
-block, which is hardcoded to ingest only `schedule_e_totals_by_candidate` for
-the 2024 cycle:
+**Running ingestion:** the CLI runs the nightly routine with no arguments, or
+chosen entities with `--entities` (and `--cycle` for the two totals ingestors).
+It exits 1 if any entity or the materialized view refresh fails.
 
 ```bash
 poetry run python -m civic_lantern.jobs.ingestion
+poetry run python -m civic_lantern.jobs.ingestion --entities inside_totals_by_candidate --cycle 2024
 ```
 
-To run the full pipeline or other entities, call `ingest()` /
-`IngestionManager` programmatically, e.g. `ingest(entities=None)` to run
-every registered ingestor.
-
-> **Known limitation:** `ScheduleETotalsByCandidateIngestor` calls
-> `FECClient.get_outside_spending_totals()`, which references
-> `self.outside_spending_url` — an attribute that is never set in
-> `FECClient.__init__`. Calling this ingestor as-is raises `AttributeError`.
-> This needs a fix before Schedule E ingestion will work end to end.
+GitHub Actions runs the nightly routine daily at 10:00 UTC
+(`.github/workflows/nightly-ingestion.yml`), and `manual-ingestion.yml` runs
+chosen entities on demand.
 
 ## Testing
 

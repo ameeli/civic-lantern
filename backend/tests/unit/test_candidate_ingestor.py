@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from civic_lantern.jobs.ingestors.candidates import CandidateIngestor
+from civic_lantern.jobs.ingestors.candidates import CANDIDATES, CandidateIngestor
 from civic_lantern.services.data.candidate import CandidateService
 
 
@@ -11,14 +11,15 @@ from civic_lantern.services.data.candidate import CandidateService
 class TestCandidateIngestor:
     """Test CandidateIngestor wiring to client, transformer, and service."""
 
-    async def test_fetch_calls_get_candidates(self, mock_client, mock_session):
-        """fetch() delegates to client.get_candidates with correct FEC params."""
-        mock_client.get_candidates.return_value = [{"candidate_id": "C001"}]
+    async def test_fetch_requests_candidates_endpoint(self, mock_client, mock_session):
+        """fetch() requests the candidates endpoint with the date window."""
+        mock_client.fetch_all.return_value = [{"candidate_id": "C001"}]
 
         ingestor = CandidateIngestor(client=mock_client, session=mock_session)
         result = await ingestor.fetch("2024-01-01", "2024-06-01", election_year=2024)
 
-        mock_client.get_candidates.assert_awaited_once_with(
+        mock_client.fetch_all.assert_awaited_once_with(
+            CANDIDATES,
             min_first_file_date="2024-01-01",
             max_first_file_date="2024-06-01",
             election_year=2024,
@@ -31,12 +32,12 @@ class TestCandidateIngestor:
     ):
         """No prior run → full historical pull, no min_first_file_date filter."""
         MockRunService.return_value.get_watermark = AsyncMock(return_value=None)
-        mock_client.get_candidates.return_value = []
+        mock_client.fetch_all.return_value = []
 
         ingestor = CandidateIngestor(client=mock_client, session=mock_session)
         await ingestor.fetch()
 
-        _, kwargs = mock_client.get_candidates.call_args
+        _, kwargs = mock_client.fetch_all.call_args
         assert "min_first_file_date" not in kwargs
         assert "max_first_file_date" in kwargs
 
