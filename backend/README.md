@@ -31,11 +31,12 @@ civic_lantern/
 │   ├── models/      # SQLAlchemy models, mixins, enums, two declarative bases
 │   └── session.py   # Async engine + AsyncSessionLocal factory
 ├── services/
-│   ├── data/        # BaseService[T] + per-table services (query/upsert logic)
+│   ├── data/        # BaseService[T] (generic upsert) + API query services
+│   ├── committee_corrections.py  # Overrides and splits FEC's candidate totals miss
 │   ├── fec_client.py     # FECClient: paginated, rate-limited, retrying HTTP client
 │   └── fec_exceptions.py # FEC error hierarchy
-├── jobs/            # Ingestion orchestration (manager, ingestion entrypoint, ingestors/)
-├── utils/           # logging setup, raw-FEC-JSON -> validated-schema transformers
+├── jobs/            # pipeline.py, ingestors/ (one declaration per entity), manager, CLI
+├── utils/           # logging setup
 └── main.py          # FastAPI app + router registration
 alembic/             # DB migrations (source of truth for schema history)
 tests/                # unit/ and integration/ suites
@@ -183,26 +184,29 @@ the ingestion pipeline only.
    retries retryable errors (server errors, timeouts, network errors) with
    exponential backoff (2s–600s, 3 attempts). Its one public method,
    `fetch_all(endpoint, **params)`, fetches every page of an `FECEndpoint`.
-2. Each ingestor in `jobs/ingestors/` declares the `FECEndpoint` it reads
-   (path, a sort key that uniquely orders rows, fixed params) next to its
-   code, and passes it to `fetch_all`. It then transforms the
-   raw JSON through a Pydantic schema (`utils/transformers.py`, invalid/
-   duplicate records are logged and skipped), and upserts via its
-   `services/data/*Service` (`INSERT ... ON CONFLICT DO UPDATE`, batched with
-   row-by-row fallback on batch failure — see `BaseService.upsert_batch`).
-3. `IngestionManager` (`jobs/manager.py`) owns a shared `FECClient` and runs
-   ingestors in dependency order via `INGESTOR_REGISTRY`
-   (`jobs/ingestors/__init__.py`): `committees` → `candidates` →
-   `inside_totals_by_candidate` → `schedule_e_totals_by_candidate`.
-4. After a batch that includes either totals ingestor, the manager refreshes
-   both materialized views (see [Materialized views](#materialized-views)).
+2. Each entity is an `Ingestion` declaration in `jobs/ingestors/<entity>.py`,
+   next to the `FECEndpoint` it reads: its scope (a date window resumed from
+   the watermark, or one election cycle), Pydantic schema, table, optional
+   committee corrections, and any fields summed across rows that share a key.
+3. One pipeline (`jobs/pipeline.py`, `run_ingestion`) runs every declaration:
+   resolve the scope, `fetch_all`, apply corrections, validate (invalid rows
+   are logged and skipped), combine rows by primary key, and upsert via
+   `BaseService` (`INSERT ... ON CONFLICT DO UPDATE` on the full primary key,
+   batched with row-by-row fallback — see `BaseService.upsert_batch`). Each
+   run is recorded in `ingestion_runs`.
+4. `IngestionManager` (`jobs/manager.py`) owns a shared `FECClient` and runs
+   the declarations in `INGESTIONS` order (`jobs/ingestors/__init__.py`),
+   parents before the tables that reference them: `committees` → `candidates`
+   → `inside_totals_by_candidate` → `schedule_e_totals_by_candidate`.
+5. After a batch that includes either per-cycle ingestion, the manager
+   refreshes both materialized views (see [Materialized views](#materialized-views)).
 
-| Ingestor | FEC data | Upserts into |
-|---|---|---|
-| `CandidateIngestor` | `/v1/candidates/` | `candidates` |
-| `CommitteeIngestor` | `/v1/committees/` | `committees` |
-| `InsideTotalsByCandidateIngestor` | `/v1/candidates/totals/` (summed across primary+general) | `inside_totals_by_candidate` |
-| `ScheduleETotalsByCandidateIngestor` | Schedule E independent-expenditure totals | `schedule_e_totals_by_candidate` |
+| Ingestion | Scope | FEC data | Upserts into |
+|---|---|---|---|
+| `COMMITTEES_INGESTION` | date window | `/v1/committees/` | `committees` |
+| `CANDIDATES_INGESTION` | date window | `/v1/candidates/` | `candidates` |
+| `INSIDE_TOTALS_INGESTION` | per cycle | `/v1/candidates/totals/`, plus committee corrections | `inside_totals_by_candidate` |
+| `SCHEDULE_E_TOTALS_INGESTION` | per cycle | `/v1/schedules/schedule_e/totals/by_candidate/` | `schedule_e_totals_by_candidate` |
 
 **Running ingestion:** the CLI runs the nightly routine with no arguments, or
 chosen entities with `--entities` (and `--cycle` for the two totals ingestors).
@@ -223,7 +227,7 @@ chosen entities on demand.
 poetry run pytest                                              # All tests
 poetry run pytest -m unit                                      # Unit tests only (mocked DB/HTTP)
 poetry run pytest -m integration                                # Integration tests (needs a running DB)
-poetry run pytest tests/unit/test_transformers.py::test_name    # Single test
+poetry run pytest tests/unit/test_candidate_schema.py::test_name  # Single test
 poetry run pytest --cov=civic_lantern                           # With coverage
 ```
 

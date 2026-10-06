@@ -16,16 +16,16 @@ Civic Lantern is a campaign finance transparency platform that tracks dark money
 - **`civic_lantern/services/`** — Business logic. `BaseService[T]` provides generic async upsert with batch processing and row-by-row fallback. `FECClient` is an async HTTP client with rate limiting (aiolimiter) and retry (tenacity)
 - **`civic_lantern/schemas/`** — Pydantic v2 models for validation and transformation of incoming FEC data (name normalization, district padding, etc.)
 - **`civic_lantern/db/`** — SQLAlchemy 2.0 async models with `TimestampMixin` (auto `created_at`/`updated_at` via PostgreSQL trigger). Session factory in `session.py`
-- **`civic_lantern/jobs/`** — Ingestion pipeline orchestration
-- **`civic_lantern/utils/`** — Transformers that validate raw API data through Pydantic schemas, skipping invalid records
+- **`civic_lantern/jobs/`** — Ingestion: `pipeline.py` runs every entity's `Ingestion` declaration (`ingestors/<entity>.py`); `manager.py` orders and schedules them. Domain terms are in `CONTEXT.md`
+- **`civic_lantern/utils/`** — Logging setup
 - **`alembic/`** — Database migrations
 
 ### Data Ingestion Flow
 
-1. `FECClient` fetches paginated data from FEC API with rate limiting (900 req/hr)
-2. Transformers validate via Pydantic schemas, logging and skipping invalid records
-3. Services perform batch upsert (`INSERT ... ON CONFLICT DO UPDATE`) with configurable batch size (default 500)
-4. On batch failure, falls back to row-by-row inserts to isolate bad records
+1. Each entity's `Ingestion` declares its scope (date window or per cycle), `FECEndpoint`, schema and table
+2. `FECClient.fetch_all` fetches every page from the FEC API with rate limiting (900 req/hr)
+3. The pipeline validates rows via Pydantic schemas (logging and skipping invalid ones) and combines rows that share a primary key
+4. `BaseService.upsert_batch` upserts on the full primary key (`INSERT ... ON CONFLICT DO UPDATE`), batch size 500, falling back to row-by-row to isolate bad records
 5. Materialized views refreshed as needed
 
 **Key Principle:** All FEC data ingestion is idempotent. Handle malformed data gracefully, log processing errors for manual review, and validate at ingestion boundaries.
@@ -67,7 +67,7 @@ poetry run alembic revision --autogenerate -m "description"   # Create new migra
 poetry run pytest                          # Run all tests
 poetry run pytest -m unit                  # Unit tests only
 poetry run pytest -m integration           # Integration tests only (requires running DB)
-poetry run pytest tests/unit/test_transformers.py::test_name  # Single test
+poetry run pytest tests/unit/test_candidate_schema.py::test_name  # Single test
 poetry run pytest --cov=civic_lantern      # With coverage
 ```
 
