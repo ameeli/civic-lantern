@@ -14,6 +14,7 @@ from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCan
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
 )
+from civic_lantern.jobs.ingestors import PER_CYCLE_INGESTIONS
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 
 
@@ -215,7 +216,7 @@ class TestIngestionRunServiceOverlapGuard:
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestIngestionRunServiceReadyCycles:
-    REQUIRED = ["inside_totals_by_candidate", "schedule_e_totals_by_candidate"]
+    REQUIRED = PER_CYCLE_INGESTIONS
 
     async def _succeed(self, service, ingestor_name, cycle):
         run = await service.start_run(ingestor_name, cycle)

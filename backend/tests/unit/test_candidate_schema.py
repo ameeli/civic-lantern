@@ -1,8 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+from civic_lantern.jobs.ingestors.candidates import CANDIDATES_INGESTION
+from civic_lantern.jobs.pipeline import validate
 from civic_lantern.schemas.candidate import CandidateIn
-from civic_lantern.utils.transformers import transform_candidates
 
 
 @pytest.mark.unit
@@ -45,13 +46,13 @@ class TestCandidateValidation:
         assert result.district == "09"
 
     def test_transform_skips_invalid(self, caplog):
-        """Transformer should skip bad records, not crash."""
+        """Validation should skip bad records, not crash."""
         raw_list = [
             {"candidate_id": "C001", "name": "Valid"},
             {"name": "No ID"},
             {"candidate_id": "C003", "name": "Also Valid"},
         ]
-        results = transform_candidates(raw_list)
+        results = validate(raw_list, CANDIDATES_INGESTION)
         assert len(results) == 2
         assert results[0].candidate_id == "C001"
         assert any("Skipping candidate" in record.message for record in caplog.records)

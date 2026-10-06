@@ -1,4 +1,4 @@
-"""End-to-end tests for InsideTotalsByCandidateIngestor.run(): FEC HTTP mocked
+"""End-to-end tests for the inside totals ingestion: FEC HTTP mocked
 with respx, real test Postgres, real client pagination/retry and transform."""
 
 from decimal import Decimal
@@ -14,8 +14,9 @@ from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.ingestion_run import IngestionRun, IngestionRunStatus
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
 from civic_lantern.jobs.ingestors.inside_totals_by_candidate import (
-    InsideTotalsByCandidateIngestor,
+    INSIDE_TOTALS_INGESTION,
 )
+from civic_lantern.jobs.pipeline import run_ingestion
 from civic_lantern.services.fec_exceptions import PartialFetchError
 
 CYCLE = 2024
@@ -118,7 +119,7 @@ class TestInsideTotalsIngestionRun:
     ):
         _mock_fec(client)
 
-        await InsideTotalsByCandidateIngestor(client, async_db).run(cycle=CYCLE)
+        await run_ingestion(INSIDE_TOTALS_INGESTION, client, async_db, cycle=CYCLE)
 
         assert await _stored_totals(async_db) == EXPECTED
 
@@ -133,12 +134,12 @@ class TestInsideTotalsIngestionRun:
     ):
         mocker.patch("asyncio.sleep")  # skip fec_retry backoff
         fec = _mock_fec(client)
-        await InsideTotalsByCandidateIngestor(client, async_db).run(cycle=CYCLE)
+        await run_ingestion(INSIDE_TOTALS_INGESTION, client, async_db, cycle=CYCLE)
 
         # Next nightly run: page 2 of one endpoint fails after retries.
         fec["failing"] = failing
         with pytest.raises(PartialFetchError):
-            await InsideTotalsByCandidateIngestor(client, async_db).run(cycle=CYCLE)
+            await run_ingestion(INSIDE_TOTALS_INGESTION, client, async_db, cycle=CYCLE)
 
         assert await _stored_totals(async_db) == EXPECTED
         run = (await async_db.execute(select(IngestionRun))).scalar_one()
