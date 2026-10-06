@@ -1,10 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
+from civic_lantern.jobs.ingestors.schedule_e_totals_by_candidate import (
+    SCHEDULE_E_TOTALS_INGESTION,
+)
+from civic_lantern.jobs.pipeline import combine, validate
 from civic_lantern.schemas.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidateIn,
 )
-from civic_lantern.utils.transformers import transform_schedule_e_totals_by_candidate
 
 VALID_RAW = {
     "candidate_id": "P00009423",
@@ -61,6 +64,11 @@ class TestScheduleETotalsByCandidateIn:
         assert result.total is None
 
 
+def transform_schedule_e_totals_by_candidate(raw):
+    ingestion = SCHEDULE_E_TOTALS_INGESTION
+    return combine(validate(raw, ingestion), ingestion)
+
+
 @pytest.mark.unit
 class TestTransformScheduleETotalsByCandidate:
     def test_valid_row_passes_through(self):
@@ -72,7 +80,7 @@ class TestTransformScheduleETotalsByCandidate:
         raw = [{**VALID_RAW, "candidate_id": None}, VALID_RAW]
         results = transform_schedule_e_totals_by_candidate(raw)
         assert len(results) == 1
-        assert any("missing" in r.message for r in caplog.records)
+        assert any("candidate_id" in r.message for r in caplog.records)
 
     def test_deduplicates_identical_composite_key(self):
         raw = [VALID_RAW, VALID_RAW]

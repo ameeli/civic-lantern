@@ -1,8 +1,9 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import TextClause
 
+from civic_lantern.jobs.ingestors.candidates import CANDIDATES_INGESTION
 from civic_lantern.jobs.manager import (
     DATE_WINDOWED_ENTITIES,
     MV_REFRESH_RESULT_KEY,
@@ -17,28 +18,27 @@ from civic_lantern.jobs.manager import (
 class TestIngestionManager:
     """Test the IngestionManager routing, lifecycle, and failure handling."""
 
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
-    async def test_ingest_routes_to_correct_ingestor(self, MockSession, manager):
-        """ingest() looks up the entity in the registry and runs it."""
-        mock_run = AsyncMock(return_value={"inserted": 1, "updated": 0, "errors": 0})
+    async def test_ingest_runs_the_named_declaration(
+        self, MockSession, mock_run, manager
+    ):
+        """ingest() looks up the declaration by name and runs it."""
+        session = AsyncMock()
+        MockSession.return_value.__aenter__.return_value = session
+        mock_run.return_value = {"inserted": 1, "updated": 0, "errors": 0}
 
-        class StubIngestor:
-            def __init__(self, **kwargs):
-                pass
-
-            run = mock_run
-
-        MockSession.return_value.__aenter__.return_value = AsyncMock()
-
-        registry = {"alpha": StubIngestor}
-        with patch(
-            "civic_lantern.jobs.manager.INGESTOR_REGISTRY",
-            new=registry,
-        ):
-            result = await manager.ingest("alpha", start_date="2024-01-01")
+        result = await manager.ingest("candidates", start_date="2024-01-01")
 
         assert result == {"inserted": 1, "updated": 0, "errors": 0}
-        mock_run.assert_awaited_once()
+        mock_run.assert_awaited_once_with(
+            CANDIDATES_INGESTION,
+            manager._client,
+            session,
+            cycle=None,
+            start_date="2024-01-01",
+            end_date=None,
+        )
 
     async def test_ingest_unknown_entity_raises(self, manager):
         """ingest() raises ValueError for unregistered entity names."""
@@ -57,63 +57,44 @@ class TestIngestionManager:
 
         mock_client.__aexit__.assert_awaited_once()
 
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
-    async def test_ingest_batch_runs_in_order(self, MockSession, manager):
-        """ingest_batch() runs all ingestors in registry order."""
-        call_order = []
-
-        class FakeIngestorA:
-            def __init__(self, **kwargs):
-                pass
-
-            async def run(self, *args, **kwargs):
-                call_order.append("a")
-                return {"inserted": 1, "updated": 0, "errors": 0}
-
-        class FakeIngestorB:
-            def __init__(self, **kwargs):
-                pass
-
-            async def run(self, *args, **kwargs):
-                call_order.append("b")
-                return {"inserted": 2, "updated": 0, "errors": 0}
-
+    async def test_ingest_batch_runs_in_declaration_order(
+        self, MockSession, mock_run, manager
+    ):
+        """ingest_batch() runs the requested entities in INGESTIONS order."""
         MockSession.return_value.__aenter__.return_value = AsyncMock()
+        mock_run.return_value = None
 
-        registry = {"entity_a": FakeIngestorA, "entity_b": FakeIngestorB}
-        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            results = await manager.ingest_batch()
+        results = await manager.ingest_batch(["candidates", "committees"])
 
-        assert call_order == ["a", "b"]
-        assert "entity_a" in results
-        assert "entity_b" in results
+        ran = [c.args[0].entity for c in mock_run.await_args_list]
+        assert ran == ["committees", "candidates"]
+        assert list(results) == ["committees", "candidates"]
 
+    async def test_ingest_batch_rejects_unknown_entities_before_running(self, manager):
+        with pytest.raises(ValueError, match="Unknown entity: 'nope'"):
+            await manager.ingest_batch(["candidates", "nope"])
+
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
-    async def test_ingest_batch_continues_on_failure(self, MockSession, manager):
+    async def test_ingest_batch_continues_on_failure(
+        self, MockSession, mock_run, manager
+    ):
         """A failed entity is recorded but doesn't block subsequent ones."""
-
-        class FailingIngestor:
-            def __init__(self, **kwargs):
-                pass
-
-            async def run(self, *args, **kwargs):
-                raise RuntimeError("FEC API down")
-
-        class SucceedingIngestor:
-            def __init__(self, **kwargs):
-                pass
-
-            async def run(self, *args, **kwargs):
-                return {"inserted": 5, "updated": 0, "errors": 0, "failed_ids": []}
-
         MockSession.return_value.__aenter__.return_value = AsyncMock()
 
-        registry = {"failing": FailingIngestor, "succeeding": SucceedingIngestor}
-        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            results = await manager.ingest_batch()
+        async def run(ingestion, *args, **kwargs):
+            if ingestion.entity == "committees":
+                raise RuntimeError("FEC API down")
+            return {"inserted": 5, "updated": 0, "errors": 0, "failed_ids": []}
 
-        assert "error" in results["failing"]
-        assert results["succeeding"]["inserted"] == 5
+        mock_run.side_effect = run
+
+        results = await manager.ingest_batch(["committees", "candidates"])
+
+        assert results["committees"] == {"error": "FEC API down"}
+        assert results["candidates"]["inserted"] == 5
 
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_refresh_spending_stats_uses_text(self, MockSession, manager):
@@ -132,20 +113,19 @@ class TestIngestionManager:
             for c in mock_session.execute.call_args_list
         )
 
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_refreshes_mv_on_spending_success(
-        self, MockSession, manager
+        self, MockSession, mock_run, manager
     ):
         """MV refresh is triggered when a spending source ingestor succeeds."""
-        mock_ingestor = MagicMock()
-        mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
-        registry = {"inside_totals_by_candidate": mock_ingestor}
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        mock_run.return_value = {"inserted": 1}
 
-        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            with patch.object(
-                manager, "refresh_spending_stats", new_callable=AsyncMock
-            ) as mock_refresh:
-                await manager.ingest_batch()
+        with patch.object(
+            manager, "refresh_spending_stats", new_callable=AsyncMock
+        ) as mock_refresh:
+            await manager.ingest_batch(["inside_totals_by_candidate"], cycle=2024)
 
         mock_refresh.assert_awaited_once()
 
@@ -159,46 +139,41 @@ class TestIngestionManager:
         with pytest.raises(RuntimeError, match="lock timeout"):
             await manager.refresh_spending_stats()
 
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
-    async def test_ingest_batch_records_mv_refresh_failure(self, MockSession, manager):
+    async def test_ingest_batch_records_mv_refresh_failure(
+        self, MockSession, mock_run, manager
+    ):
         """A failed refresh is recorded as an error result, so the CLI exits 1."""
-        mock_ingestor = MagicMock()
-        mock_ingestor.return_value.run = AsyncMock(return_value={"inserted": 1})
-        registry = {"inside_totals_by_candidate": mock_ingestor}
+        MockSession.return_value.__aenter__.return_value = AsyncMock()
+        mock_run.return_value = {"inserted": 1}
 
-        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            with patch.object(
-                manager,
-                "refresh_spending_stats",
-                new_callable=AsyncMock,
-                side_effect=RuntimeError("lock timeout"),
-            ):
-                results = await manager.ingest_batch()
+        with patch.object(
+            manager,
+            "refresh_spending_stats",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("lock timeout"),
+        ):
+            results = await manager.ingest_batch(
+                ["inside_totals_by_candidate"], cycle=2024
+            )
 
         assert results["inside_totals_by_candidate"] == {"inserted": 1}
         assert results[MV_REFRESH_RESULT_KEY] == {"error": "lock timeout"}
 
+    @patch("civic_lantern.jobs.manager.run_ingestion", new_callable=AsyncMock)
     @patch("civic_lantern.jobs.manager.JobSessionLocal")
     async def test_ingest_batch_skips_mv_refresh_on_spending_failure(
-        self, MockSession, manager
+        self, MockSession, mock_run, manager
     ):
         """MV refresh is skipped when all spending source ingestors error."""
-
-        class FailingSpendingIngestor:
-            def __init__(self, **kwargs):
-                pass
-
-            async def run(self, *args, **kwargs):
-                raise RuntimeError("spending fetch failed")
-
         MockSession.return_value.__aenter__.return_value = AsyncMock()
+        mock_run.side_effect = RuntimeError("spending fetch failed")
 
-        registry = {"inside_totals_by_candidate": FailingSpendingIngestor}
-        with patch("civic_lantern.jobs.manager.INGESTOR_REGISTRY", new=registry):
-            with patch.object(
-                manager, "refresh_spending_stats", new_callable=AsyncMock
-            ) as mock_refresh:
-                await manager.ingest_batch()
+        with patch.object(
+            manager, "refresh_spending_stats", new_callable=AsyncMock
+        ) as mock_refresh:
+            await manager.ingest_batch(["inside_totals_by_candidate"], cycle=2024)
 
         mock_refresh.assert_not_awaited()
 
