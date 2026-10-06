@@ -24,7 +24,7 @@ Civic Lantern is a campaign finance transparency platform that tracks dark money
 
 1. Each entity's `Ingestion` declares its scope (date window or per cycle), `FECEndpoint`, schema and table
 2. `FECClient.fetch_all` fetches every page from the FEC API with rate limiting (900 req/hr)
-3. The pipeline validates rows via Pydantic schemas (logging and skipping invalid ones) and combines rows that share a primary key
+3. The pipeline validates rows via Pydantic schemas (logging and skipping invalid ones, except a summing ingestion fails the run on an invalid row that has its key) and combines rows that share a primary key
 4. `BaseService.upsert_batch` upserts on the full primary key (`INSERT ... ON CONFLICT DO UPDATE`), batch size 500, falling back to row-by-row to isolate bad records
 5. Materialized views refreshed as needed
 

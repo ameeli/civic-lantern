@@ -190,7 +190,8 @@ the ingestion pipeline only.
    committee corrections, and any fields summed across rows that share a key.
 3. One pipeline (`jobs/pipeline.py`, `run_ingestion`) runs every declaration:
    resolve the scope, `fetch_all`, apply corrections, validate (invalid rows
-   are logged and skipped), combine rows by primary key, and upsert via
+   are logged and skipped, but a summing ingestion fails the run on an
+   invalid row that has its key), combine rows by primary key, and upsert via
    `BaseService` (`INSERT ... ON CONFLICT DO UPDATE` on the full primary key,
    batched with row-by-row fallback — see `BaseService.upsert_batch`). Each
    run is recorded in `ingestion_runs`.
