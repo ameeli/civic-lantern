@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from civic_lantern.jobs.ingestors.schedule_e_totals_by_candidate import (
+    SCHEDULE_E_TOTALS,
     ScheduleETotalsByCandidateIngestor,
 )
 from civic_lantern.services.data.schedule_e_totals_by_candidate import (
@@ -13,11 +14,11 @@ from civic_lantern.services.data.schedule_e_totals_by_candidate import (
 @pytest.mark.unit
 @pytest.mark.asyncio
 class TestScheduleETotalsByCandidateIngestor:
-    async def test_fetch_calls_get_candidate_schedule_e_totals(
+    async def test_fetch_requests_schedule_e_totals_endpoint(
         self, mock_client, mock_session
     ):
-        """fetch() delegates to client.get_candidate_schedule_e_totals with cycle."""
-        mock_client.get_candidate_schedule_e_totals.return_value = [
+        """fetch() requests the schedule E totals endpoint for the cycle."""
+        mock_client.fetch_all.return_value = [
             {
                 "candidate_id": "P001",
                 "cycle": 2024,
@@ -31,7 +32,7 @@ class TestScheduleETotalsByCandidateIngestor:
         )
         result = await ingestor.fetch(cycle=2024)
 
-        mock_client.get_candidate_schedule_e_totals.assert_awaited_once_with(cycle=2024)
+        mock_client.fetch_all.assert_awaited_once_with(SCHEDULE_E_TOTALS, cycle=2024)
         assert len(result) == 1
 
     async def test_fetch_without_cycle_raises_type_error(

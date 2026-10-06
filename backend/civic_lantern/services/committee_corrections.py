@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict, List, Sequence
 
-from civic_lantern.services.fec_client import FECClient
+from civic_lantern.services.fec_client import FECClient, FECEndpoint
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,23 @@ KNOWN_COMMITTEE_SPLITS: tuple[CommitteeSplit, ...] = (
 )
 
 
+# A committee's own totals, one row per cycle.
+COMMITTEE_TOTALS = FECEndpoint(
+    name="committee totals",
+    path="/committee/{committee_id}/totals/",
+    sort=("-cycle",),
+)
+
+# A committee's filed reports, each with period-only totals. Amended periods
+# repeat; FEC flags one per period `most_recent`, and _split_rows filters on it.
+COMMITTEE_REPORTS = FECEndpoint(
+    name="committee reports",
+    path="/committee/{committee_id}/reports/",
+    sort=("coverage_start_date", "beginning_image_number"),
+    required=("cycle",),
+)
+
+
 class CommitteeSplitDataError(RuntimeError):
     """A split committee returned no most_recent reports; raised rather than
     writing zero rows over good data."""
@@ -84,12 +101,12 @@ class CommitteeCorrections:
         its split committees."""
         inputs = CorrectionInputs()
         for override in self._overrides_for(cycle):
-            inputs.committee_totals[override.committee_id] = (
-                await client.get_committee_totals(override.committee_id, cycle=cycle)
+            inputs.committee_totals[override.committee_id] = await client.fetch_all(
+                COMMITTEE_TOTALS, committee_id=override.committee_id, cycle=cycle
             )
         for split in self._splits_for(cycle):
-            inputs.committee_reports[split.committee_id] = (
-                await client.get_committee_reports(split.committee_id, cycle=cycle)
+            inputs.committee_reports[split.committee_id] = await client.fetch_all(
+                COMMITTEE_REPORTS, committee_id=split.committee_id, cycle=cycle
             )
         return inputs
 

@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.jobs.manager import IngestionManager
+from civic_lantern.services.fec_client import FECClient
 
 
 @pytest.fixture
@@ -20,7 +21,7 @@ def mock_session() -> AsyncMock:
 
 @pytest.fixture
 def mock_client() -> AsyncMock:
-    return AsyncMock()
+    return AsyncMock(spec=FECClient)
 
 
 @pytest.fixture

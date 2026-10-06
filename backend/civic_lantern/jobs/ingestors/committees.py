@@ -2,7 +2,10 @@ from typing import Any, Dict, List, Optional
 
 from civic_lantern.jobs.base_ingestor import BaseIngestor
 from civic_lantern.services.data.committee import CommitteeService
+from civic_lantern.services.fec_client import FECEndpoint
 from civic_lantern.utils.transformers import transform_committees
+
+COMMITTEES = FECEndpoint(name="committees", path="/committees/", sort=("committee_id",))
 
 
 class CommitteeIngestor(BaseIngestor):
@@ -26,7 +29,7 @@ class CommitteeIngestor(BaseIngestor):
         if start_date:
             kwargs["min_first_file_date"] = start_date
         kwargs["max_first_file_date"] = end_date
-        return await self.client.get_committees(**kwargs)
+        return await self.client.fetch_all(COMMITTEES, **kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
         """Validate raw committee dicts through CommitteeIn schema."""

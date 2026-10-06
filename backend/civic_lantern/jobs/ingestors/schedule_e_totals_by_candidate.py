@@ -4,7 +4,17 @@ from civic_lantern.jobs.base_ingestor import BaseIngestor
 from civic_lantern.services.data.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidateService,
 )
+from civic_lantern.services.fec_client import FEDERAL_OFFICES, FECEndpoint
 from civic_lantern.utils.transformers import transform_schedule_e_totals_by_candidate
+
+SCHEDULE_E_TOTALS = FECEndpoint(
+    name="schedule E totals by candidate",
+    path="/schedules/schedule_e/totals/by_candidate/",
+    # Rows are unique per (candidate_id, support_oppose_indicator) in a cycle.
+    sort=("candidate_id", "support_oppose_indicator"),
+    params={"office": FEDERAL_OFFICES},
+    required=("cycle",),
+)
 
 
 class ScheduleETotalsByCandidateIngestor(BaseIngestor):
@@ -13,14 +23,12 @@ class ScheduleETotalsByCandidateIngestor(BaseIngestor):
 
     entity_name = "schedule_e_totals_by_candidate"
 
-    # IngestionManager always threads a matching `cycle` kwarg for this
-    # cycle-scoped ingestor, so narrowing the base class's fully-generic
-    # **kwargs signature is safe in practice.
+    # Narrower than the base **kwargs; IngestionManager always passes `cycle`.
     async def fetch(  # type: ignore[override]
         self, cycle: int, **kwargs: Any
     ) -> List[Dict[str, Any]]:
         """Fetch IE totals per candidate for the given cycle."""
-        return await self.client.get_candidate_schedule_e_totals(cycle=cycle, **kwargs)
+        return await self.client.fetch_all(SCHEDULE_E_TOTALS, cycle=cycle, **kwargs)
 
     def transform(self, raw_data: List[Dict[str, Any]]) -> list:
         """Validate raw schedule E totals."""

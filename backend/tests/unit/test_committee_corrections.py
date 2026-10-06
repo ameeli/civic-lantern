@@ -1,9 +1,11 @@
 from datetime import date
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, call
 
 import pytest
 
 from civic_lantern.services.committee_corrections import (
+    COMMITTEE_REPORTS,
+    COMMITTEE_TOTALS,
     CommitteeCorrections,
     CommitteeOverride,
     CommitteeSplit,
@@ -190,13 +192,18 @@ class TestFetchInputs:
             splits=(SPLIT,),
         )
         client = AsyncMock(spec=FECClient)
-        client.get_committee_totals.return_value = [{"receipts": 1}]
-        client.get_committee_reports.return_value = [{"most_recent": True}]
+        responses = {
+            COMMITTEE_TOTALS: [{"receipts": 1}],
+            COMMITTEE_REPORTS: [{"most_recent": True}],
+        }
+        client.fetch_all.side_effect = lambda endpoint, **_: responses[endpoint]
 
         inputs = await corrections.fetch_inputs(client, CYCLE)
 
-        client.get_committee_totals.assert_awaited_once_with("C_DROPPED", cycle=CYCLE)
-        client.get_committee_reports.assert_awaited_once_with("C_SHARED", cycle=CYCLE)
+        assert client.fetch_all.await_args_list == [
+            call(COMMITTEE_TOTALS, committee_id="C_DROPPED", cycle=CYCLE),
+            call(COMMITTEE_REPORTS, committee_id="C_SHARED", cycle=CYCLE),
+        ]
         assert inputs == CorrectionInputs(
             committee_totals={"C_DROPPED": [{"receipts": 1}]},
             committee_reports={"C_SHARED": [{"most_recent": True}]},
@@ -207,6 +214,5 @@ class TestFetchInputs:
 
         inputs = await CommitteeCorrections().fetch_inputs(client, 1900)
 
-        client.get_committee_totals.assert_not_awaited()
-        client.get_committee_reports.assert_not_awaited()
+        client.fetch_all.assert_not_awaited()
         assert inputs == CorrectionInputs()
