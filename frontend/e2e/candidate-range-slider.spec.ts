@@ -22,6 +22,14 @@ async function fetchSenateDefaultRange() {
   };
 }
 
+async function fetchTopSpend(office: string) {
+  const res = await fetch(
+    `${API_BASE}/candidate-spending?cycle=${CYCLE}&office=${office}&sort_by=total_spending&order=desc&limit=1`,
+  );
+  const body = (await res.json()) as { items: { total_spending: number }[] };
+  return body.items[0].total_spending;
+}
+
 test.describe("Candidate spending pack chart: dollar-range slider", () => {
   test("chart loads with three office bubbles and no console errors", async ({
     page,
@@ -168,5 +176,39 @@ test.describe("Candidate spending pack chart: dollar-range slider", () => {
         ),
       )
       .toBeCloseTo(Number(radiusBefore), 1);
+  });
+
+  test("slider shows only while an office is focused, for that office", async ({
+    page,
+  }) => {
+    const [senateTop, houseTop] = await Promise.all([
+      fetchTopSpend("S"),
+      fetchTopSpend("H"),
+    ]);
+    const minHandle = page.getByRole("slider", {
+      name: "Minimum total spending",
+    });
+    const maxHandle = page.getByRole("slider", {
+      name: "Maximum total spending",
+    });
+
+    await page.goto(`/?cycle=${CYCLE}`);
+    await expect(
+      page.locator('circle.fill-office-senate[opacity="0.7"]'),
+    ).toBeVisible();
+    await expect(minHandle).toHaveCount(0);
+
+    await page.locator("circle.fill-office-senate").click();
+    await expect(maxHandle).toHaveAttribute("aria-valuemax", String(senateTop));
+
+    await page.getByRole("button", { name: "All Races" }).click();
+    await expect(minHandle).toHaveCount(0);
+
+    await page.locator('circle.fill-office-house[opacity="0.7"]').click();
+    await expect(maxHandle).toHaveAttribute("aria-valuemax", String(houseTop));
+
+    // Drilling into a candidate (one level below the office) hides it again.
+    await page.locator('circle[opacity="0.7"]').first().click();
+    await expect(minHandle).toHaveCount(0);
   });
 });

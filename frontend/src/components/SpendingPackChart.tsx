@@ -43,7 +43,8 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     office: OfficeCode;
     range: DollarRange;
   } | null>(null);
-  const [focusDepth, setFocusDepth] = useState(0);
+  // Set alongside focusRef in zoomTo, so render never reads the ref.
+  const [focusedOfficeCode, setFocusedOfficeCode] = useState<OfficeCode>();
 
   // Refs let handleNavigate reach into the live D3 state.
   const packRootRef = useRef<PackNode | null>(null);
@@ -243,7 +244,6 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     function zoomTo(target: PackNode, opts: { animate?: boolean } = {}) {
       focusRef.current = target;
       updateVisibility(target);
-      setFocusDepth(target.depth);
 
       const rawPath = target
         .ancestors()
@@ -260,6 +260,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
               target.ancestors().find((n) => n.depth === 1)?.data as
                 RaceNode | undefined
             )?.code;
+      setFocusedOfficeCode(target.depth === 1 ? targetOffice : undefined);
       const clearRangeIfLeavingOffice = () =>
         setActiveRange((prev) =>
           prev && prev.office === targetOffice ? prev : null,
@@ -319,10 +320,6 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     if (target) zoomTo(target);
   }
 
-  const focusedOfficeCode =
-    focusDepth === 1
-      ? (focusRef.current?.data as RaceNode | undefined)?.code
-      : undefined;
   const officeSpends = useMemo(
     () =>
       focusedOfficeCode
@@ -351,9 +348,7 @@ export default function SpendingPackChart({ data }: SpendingPackChartProps) {
     );
   }, [data, focusedOfficeCode, activeRange]);
 
-  const showSlider = Boolean(
-    focusDepth === 1 && focusedOfficeCode && officeBounds && currentRange,
-  );
+  const showSlider = Boolean(focusedOfficeCode && officeBounds && currentRange);
 
   return (
     <div className="w-full mx-auto max-w-200 py-4">

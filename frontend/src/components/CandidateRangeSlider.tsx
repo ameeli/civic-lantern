@@ -79,11 +79,12 @@ export default function CandidateRangeSlider({
     return bounds.min + fraction * span;
   }
 
-  function onHandlePointerDown(handle: "min" | "max") {
-    return (e: React.PointerEvent<HTMLDivElement>) => {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      draggingRef.current = handle;
-    };
+  function onHandlePointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    handle: "min" | "max",
+  ) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = handle;
   }
 
   function onHandlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -104,29 +105,30 @@ export default function CandidateRangeSlider({
     onCommit(liveRef.current);
   }
 
-  function onHandleKeyDown(handle: "min" | "max") {
-    return (e: React.KeyboardEvent<HTMLDivElement>) => {
-      const step = span / 100 || 1;
-      let delta = 0;
-      if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = step;
-      if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = -step;
-      if (!delta) return;
-      e.preventDefault();
-      const current = liveRef.current;
-      const raw: DollarRange =
-        handle === "min"
-          ? {
-              min: clampMin(current.min + delta, current.max, bounds.min),
-              max: current.max,
-            }
-          : {
-              min: current.min,
-              max: clampMax(current.max + delta, current.min, bounds.max),
-            };
-      const next = clampToCap(raw, handle);
-      setLiveRange(next);
-      onCommit(next);
-    };
+  function onHandleKeyDown(
+    e: React.KeyboardEvent<HTMLDivElement>,
+    handle: "min" | "max",
+  ) {
+    const step = span / 100 || 1;
+    let delta = 0;
+    if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = step;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = -step;
+    if (!delta) return;
+    e.preventDefault();
+    const current = liveRef.current;
+    const raw: DollarRange =
+      handle === "min"
+        ? {
+            min: clampMin(current.min + delta, current.max, bounds.min),
+            max: current.max,
+          }
+        : {
+            min: current.min,
+            max: clampMax(current.max + delta, current.min, bounds.max),
+          };
+    const next = clampToCap(raw, handle);
+    setLiveRange(next);
+    onCommit(next);
   }
 
   function handleMinBlur() {
@@ -182,11 +184,11 @@ export default function CandidateRangeSlider({
           aria-valuenow={live.min}
           className="absolute top-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--color-ink) cursor-grab touch-none"
           style={{ left: `${pct(live.min)}%` }}
-          onPointerDown={onHandlePointerDown("min")}
+          onPointerDown={(e) => onHandlePointerDown(e, "min")}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
-          onKeyDown={onHandleKeyDown("min")}
+          onKeyDown={(e) => onHandleKeyDown(e, "min")}
         />
         <div
           role="slider"
@@ -197,11 +199,11 @@ export default function CandidateRangeSlider({
           aria-valuenow={live.max}
           className="absolute top-1/2 w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--color-ink) cursor-grab touch-none"
           style={{ left: `${pct(live.max)}%` }}
-          onPointerDown={onHandlePointerDown("max")}
+          onPointerDown={(e) => onHandlePointerDown(e, "max")}
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
-          onKeyDown={onHandleKeyDown("max")}
+          onKeyDown={(e) => onHandleKeyDown(e, "max")}
         />
       </div>
 
