@@ -44,6 +44,20 @@ class PerCycle:
 Scope = Union[DateWindow, PerCycle]
 
 
+@dataclass(frozen=True)
+class RunOutcome:
+    """How one run ended, mirroring its `ingestion_runs` row."""
+
+    status: IngestionRunStatus
+    # None when there were no rows to upsert, or the run failed.
+    stats: Optional[UpsertStats] = None
+    error: Optional[str] = None
+
+    @property
+    def wrote_rows(self) -> bool:
+        return self.stats is not None
+
+
 class InvalidRowError(ValueError):
     """A row of a summing ingestion failed validation; skipping it would
     understate that key's total, so the run fails instead."""
@@ -96,9 +110,10 @@ async def run_ingestion(
     cycle: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-) -> Optional[UpsertStats]:
+) -> RunOutcome:
     """Fetch → validate → combine → upsert, tracked in `ingestion_runs` by
-    (entity, cycle). Dates are ignored for per-cycle ingestions."""
+    (entity, cycle). Dates are ignored for per-cycle ingestions. Raises if the
+    run fails, after recording it as FAILED (or CANCELLED)."""
     if ingestion.per_cycle and cycle is None:
         raise ValueError(f"{ingestion.entity} runs per cycle; pass a cycle")
     if not ingestion.per_cycle and cycle is not None:
@@ -138,7 +153,7 @@ async def run_ingestion(
             await run_tracker.complete_run(
                 run_row, status=status, error_message=partial_note
             )
-            return None
+            return RunOutcome(status, error=partial_note)
 
         stats = await BaseService(ingestion.model, db=session).upsert_batch(rows)
         logger.info(
@@ -168,7 +183,7 @@ async def run_ingestion(
         await run_tracker.complete_run(
             run_row, status=status, error_message=error_message
         )
-        return stats
+        return RunOutcome(status, stats, error_message)
     except asyncio.CancelledError:
         # SIGTERM arrives as cancellation (see ingestion.py). Record it so the
         # row isn't stuck IN_PROGRESS, then re-raise to honour cancellation.

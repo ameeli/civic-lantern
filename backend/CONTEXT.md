@@ -15,3 +15,7 @@ Terms used in the backend's ingestion code. Use these names in code, tests and r
 **Invalid row**: a row that fails its schema. It's logged and skipped, except in a summing ingestion, where a row with its key fails the run (`InvalidRowError`) rather than understate a total.
 
 **Partial fetch**: some pages failed after retries. It's allowed only for ingestions whose rows don't combine several pieces.
+
+**Run outcome**: how one run ended (`RunOutcome`: status, upsert stats, error), mirroring its `ingestion_runs` row. A failed run raises from the pipeline; the manager records it as a FAILED outcome and moves on.
+
+**Run report**: everything one CLI invocation did (`RunReport`): each run's outcome by (entity, cycle), whether the overlap guard skipped the night, and any MV refresh error. The CLI logs its summary and exits 1 if anything failed; a partial success still exits 0.
