@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "d3": "^7.9.0",
-    "next": "^16.3.8",
+    "next": "^16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.1",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
@@ -26,14 +26,14 @@
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^10.11.0",
-    "eslint-config-next": "^16.3.8",
-    "jsdom": "^30.1.1",
+    "eslint": "^10.12.0",
+    "eslint-config-next": "^16.4.0",
+    "jsdom": "^30.1.2",
     "msw": "^2.15.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   }
 }
