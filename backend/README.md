@@ -130,8 +130,9 @@ Both views are refreshed by application code, not a DB trigger or cron:
 `IngestionManager.refresh_spending_stats()` (`civic_lantern/jobs/manager.py`)
 runs `REFRESH MATERIALIZED VIEW CONCURRENTLY` on `mv_candidate_spending_summary`
 first, then `mv_election_spending_summary` (order matters — the latter reads
-from the former). This runs automatically after any ingestion batch that
-included `inside_totals_by_candidate` or `schedule_e_totals_by_candidate`.
+from the former). This runs automatically at the end of an ingestion batch in
+which an `inside_totals_by_candidate` or `schedule_e_totals_by_candidate` run
+succeeded and wrote rows.
 
 ### Enums
 
@@ -195,12 +196,13 @@ the ingestion pipeline only.
    `BaseService` (`INSERT ... ON CONFLICT DO UPDATE` on the full primary key,
    batched with row-by-row fallback — see `BaseService.upsert_batch`). Each
    run is recorded in `ingestion_runs`.
-4. `IngestionManager` (`jobs/manager.py`) owns a shared `FECClient` and runs
+4. `IngestionManager` (`jobs/manager.py`) is given an `FECClient` and a
+   session factory (the CLI, `jobs/ingestion.py`, builds the live ones) and runs
    the declarations in `INGESTIONS` order (`jobs/ingestors/__init__.py`),
    parents before the tables that reference them: `committees` → `candidates`
    → `inside_totals_by_candidate` → `schedule_e_totals_by_candidate`.
-5. After a batch that includes either per-cycle ingestion, the manager
-   refreshes both materialized views (see [Materialized views](#materialized-views)).
+5. After the batch, the manager refreshes both materialized views when needed
+   (see [Materialized views](#materialized-views)).
 
 | Ingestion | Scope | FEC data | Upserts into |
 |---|---|---|---|
@@ -211,7 +213,8 @@ the ingestion pipeline only.
 
 **Running ingestion:** the CLI runs the nightly routine with no arguments, or
 chosen entities with `--entities` (and `--cycle` for the two totals ingestors).
-It exits 1 if any entity or the materialized view refresh fails.
+It logs a per-run summary and exits 1 if any entity or the materialized view
+refresh fails.
 
 ```bash
 poetry run python -m civic_lantern.jobs.ingestion
@@ -236,7 +239,10 @@ poetry run pytest --cov=civic_lantern                           # With coverage
   touch a real database.
 - **Integration tests** use a real Postgres database at
   `TEST_DATABASE_URL_ASYNC`, creating/dropping tables via SQLAlchemy metadata
-  per session.
+  per session. The ingestion CLI end-to-end tests (`test_ingestion_e2e.py`)
+  instead create a scratch database migrated with `alembic upgrade head` and
+  drop it afterward; they're skipped unless that URL's host is `localhost` or
+  `127.0.0.1`.
 
 ## Linting & Formatting
 
