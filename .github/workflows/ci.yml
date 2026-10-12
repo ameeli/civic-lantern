@@ -73,7 +73,8 @@ jobs:
       - run: npx prettier --check .
       - run: npx next typegen
       - run: npx tsc --noEmit
-      - run: npm audit --audit-level=high
+      # Only shipped dependencies block CI; dev-tool advisories show as Dependabot alerts.
+      - run: npm audit --audit-level=high --omit=dev
 
   frontend-tests:
     runs-on: ubuntu-latest
