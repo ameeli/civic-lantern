@@ -26,8 +26,8 @@ async def ingest(
         end_date: End of date range (default: today).
         entities: Optional list of entity names to ingest.
             If None, runs all registered entities in dependency order.
-        **kwargs: Additional params forwarded to each ingestor's fetch()
-            (e.g. cycle=2024 for spending ingestors).
+        **kwargs: Passed to IngestionManager.ingest_batch, e.g. cycle=2024
+            for the per-cycle ingestions.
 
     Returns:
         Dict mapping entity names to their ingestion stats (or error info).
@@ -49,10 +49,10 @@ async def _run_cancellable(coro: Awaitable[T]) -> T:
 
     GitHub Actions sends SIGTERM (then SIGKILL ~7.5s later) when a workflow
     run is cancelled. Without a handler, Python has no default response to
-    SIGTERM at all — the process just dies mid-await, and BaseIngestor.run()
+    SIGTERM at all — the process just dies mid-await, and run_ingestion()
     never gets a chance to mark its `ingestion_runs` row as anything other
     than IN_PROGRESS. Cancelling the task instead raises CancelledError at
-    the current await point, which propagates up through BaseIngestor.run()'s
+    the current await point, which propagates up through run_ingestion()'s
     own CancelledError handler before this function re-raises it.
     """
     task = asyncio.ensure_future(coro)

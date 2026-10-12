@@ -5,22 +5,28 @@ from sqlalchemy import text
 
 from civic_lantern.core.cycles import active_cycles
 from civic_lantern.db.session import JobSessionLocal
-from civic_lantern.jobs.ingestors import INGESTOR_REGISTRY, SPENDING_INGESTOR_NAMES
+from civic_lantern.jobs.ingestors import (
+    DATE_WINDOW_INGESTIONS,
+    INGESTIONS,
+    INGESTIONS_BY_NAME,
+    SPENDING_INGESTOR_NAMES,
+)
+from civic_lantern.jobs.pipeline import run_ingestion
 from civic_lantern.services.data.base import UpsertStats
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
 logger = logging.getLogger(__name__)
 
-# Ingested once per run, no cycle parameter (date-windowed).
-DATE_WINDOWED_ENTITIES = ["committees", "candidates"]
-# Looped once per active cycle — cycle-scoped snapshot ingestors.
+# Ingested once per run, resuming from the watermark.
+DATE_WINDOWED_ENTITIES = [i.entity for i in DATE_WINDOW_INGESTIONS]
+# Looped once per active cycle.
 SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
 # Generous enough to never false-positive on a legitimately slow run — in
-# particular, an ingestor's very first-ever invocation does a full,
-# unfiltered historical pull (see BaseIngestor._resolve_dates) that can take
-# several hours under the FEC 900/hr rate limit. Still self-heals well
-# before the next night's scheduled trigger.
+# particular, an entity's very first date-window run does a full, unfiltered
+# historical pull (see pipeline._date_window_params) that can take several
+# hours under the FEC 900/hr rate limit. Still self-heals well before the
+# next night's scheduled trigger.
 OVERLAP_TIMEOUT_MINUTES = 720
 # Result key for a failed MV refresh, so the CLI counts it as a failure.
 MV_REFRESH_RESULT_KEY = "refresh_spending_stats"
@@ -54,25 +60,27 @@ class IngestionManager:
         entity: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        **kwargs: Any,
+        cycle: Optional[int] = None,
     ) -> Optional[UpsertStats]:
-        """Run a single ingestor by entity name."""
+        """Run one entity's ingestion by name."""
         if self._client is None:
             raise RuntimeError(
                 "IngestionManager must be used as an async context manager. "
                 "Use 'async with IngestionManager() as manager:'"
             )
 
-        ingestor_cls = INGESTOR_REGISTRY.get(entity)
-        if not ingestor_cls:
-            raise ValueError(
-                f"Unknown entity: '{entity}'. Available: {list(INGESTOR_REGISTRY)}"
-            )
+        ingestion = INGESTIONS_BY_NAME.get(entity)
+        if ingestion is None:
+            raise ValueError(_unknown_entity(entity))
 
         async with JobSessionLocal() as session:
-            ingestor = ingestor_cls(client=self._client, session=session)
-            return await ingestor.run(
-                start_date=start_date, end_date=end_date, **kwargs
+            return await run_ingestion(
+                ingestion,
+                self._client,
+                session,
+                cycle=cycle,
+                start_date=start_date,
+                end_date=end_date,
             )
 
     async def ingest_batch(
@@ -81,8 +89,8 @@ class IngestionManager:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         *,
+        cycle: Optional[int] = None,
         skip_mv_refresh: bool = False,
-        **kwargs: Any,
     ) -> Dict[str, Any]:
         """Run ingestors for the given entities, or all if not specified.
 
@@ -94,17 +102,16 @@ class IngestionManager:
         overall rather than once per call — the MVs span every cycle, so
         refreshing after each individual cycle is redundant work.
         """
-        if entities:
-            registry_keys = list(INGESTOR_REGISTRY.keys())
-            targets = sorted(entities, key=lambda x: registry_keys.index(x))
-        else:
-            targets = list(INGESTOR_REGISTRY.keys())
+        unknown = [e for e in entities or [] if e not in INGESTIONS_BY_NAME]
+        if unknown:
+            raise ValueError(_unknown_entity(unknown[0]))
+        targets = [i.entity for i in INGESTIONS if not entities or i.entity in entities]
 
         results: Dict[str, Any] = {}
 
         for name in targets:
             try:
-                results[name] = await self.ingest(name, start_date, end_date, **kwargs)
+                results[name] = await self.ingest(name, start_date, end_date, cycle)
             except Exception as e:
                 logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
                 results[name] = {"error": str(e)}
@@ -187,3 +194,7 @@ class IngestionManager:
         except Exception as e:
             logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
             results[MV_REFRESH_RESULT_KEY] = {"error": str(e)}
+
+
+def _unknown_entity(entity: str) -> str:
+    return f"Unknown entity: '{entity}'. Available: {list(INGESTIONS_BY_NAME)}"

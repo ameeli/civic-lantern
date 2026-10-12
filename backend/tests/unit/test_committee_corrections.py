@@ -3,6 +3,10 @@ from unittest.mock import AsyncMock, call
 
 import pytest
 
+from civic_lantern.jobs.ingestors.inside_totals_by_candidate import (
+    INSIDE_TOTALS_INGESTION,
+)
+from civic_lantern.jobs.pipeline import combine, validate
 from civic_lantern.services.committee_corrections import (
     COMMITTEE_REPORTS,
     COMMITTEE_TOTALS,
@@ -13,7 +17,6 @@ from civic_lantern.services.committee_corrections import (
     CorrectionInputs,
 )
 from civic_lantern.services.fec_client import FECClient
-from civic_lantern.utils.transformers import transform_inside_totals_by_candidate
 
 CYCLE = 2024
 BEFORE, AFTER = "P_BEFORE", "P_AFTER"
@@ -176,7 +179,9 @@ class TestApplyGeneral:
         raw = [_row(BEFORE, 1_175_189_365.41, 1), _row(AFTER, 1_175_189_365.41, 1)]
 
         rows = corrections.apply(raw, CYCLE, inputs)
-        totals = {r.candidate_id: r for r in transform_inside_totals_by_candidate(rows)}
+        ingestion = INSIDE_TOTALS_INGESTION
+        combined = combine(validate(rows, ingestion), ingestion)
+        totals = {r.candidate_id: r for r in combined}
 
         assert totals[BEFORE].receipts == pytest.approx(500.0 + 20.0)
         assert totals[AFTER].receipts == pytest.approx(700.0 + 11.0)

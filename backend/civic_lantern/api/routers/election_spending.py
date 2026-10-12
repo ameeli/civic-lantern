@@ -8,7 +8,7 @@ from civic_lantern.core.cycles import current_cycle_ceiling
 from civic_lantern.db.models.mv_election_spending_summary import (
     MvElectionSpendingSummary,
 )
-from civic_lantern.jobs.ingestors import SPENDING_INGESTOR_NAMES
+from civic_lantern.jobs.ingestors import PER_CYCLE_INGESTIONS
 from civic_lantern.schemas.election_spending import ElectionSpending
 from civic_lantern.services.data.election_spending import ElectionSpendingService
 from civic_lantern.services.data.ingestion_run import IngestionRunService
@@ -54,13 +54,13 @@ async def get_election_spending(
 async def get_ready_election_cycles(
     db: AsyncSession = Depends(get_db),
 ) -> list[int]:
-    """Cycles where every spending ingestor has succeeded, newest first.
+    """Cycles where every per-cycle ingestion has succeeded, newest first.
 
     Must be declared before /{cycle} — otherwise Starlette matches "cycles"
     against that path param and 422s trying to parse it as an int.
     """
     service = IngestionRunService(db)
-    return await service.get_ready_cycles(SPENDING_INGESTOR_NAMES)
+    return await service.get_ready_cycles(PER_CYCLE_INGESTIONS)
 
 
 @router.get("/{cycle}", response_model=ElectionSpending)

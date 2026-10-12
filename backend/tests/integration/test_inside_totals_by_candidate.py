@@ -1,4 +1,4 @@
-"""Integration tests for InsideTotalsByCandidateService."""
+"""Integration tests for upserting inside totals by candidate."""
 
 from decimal import Decimal
 
@@ -8,9 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
-from civic_lantern.services.data.inside_totals_by_candidate import (
-    InsideTotalsByCandidateService,
-)
+from civic_lantern.services.data.base import BaseService
 
 
 async def _seed(
@@ -58,7 +56,7 @@ async def two_candidates(async_db: AsyncSession):
 @pytest.mark.asyncio
 class TestInsideTotalsByCandidateUpsert:
     async def test_insert_new_record(self, async_db, two_candidates):
-        service = InsideTotalsByCandidateService(db=async_db)
+        service = BaseService(InsideTotalsByCandidate, db=async_db)
         result = await service.get_by_id("C001")
 
         assert result is not None
@@ -68,7 +66,7 @@ class TestInsideTotalsByCandidateUpsert:
         assert result.disbursements == Decimal("480000.00")
 
     async def test_upsert_updates_existing_record(self, async_db, two_candidates):
-        service = InsideTotalsByCandidateService(db=async_db)
+        service = BaseService(InsideTotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
                 {
@@ -87,7 +85,7 @@ class TestInsideTotalsByCandidateUpsert:
         assert updated.receipts == Decimal("600000.00")
 
     async def test_upsert_inserts_new_cycle(self, async_db, two_candidates):
-        service = InsideTotalsByCandidateService(db=async_db)
+        service = BaseService(InsideTotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
                 {
@@ -113,7 +111,7 @@ class TestInsideTotalsByCandidateUpsert:
                 )
             ],
         )
-        service = InsideTotalsByCandidateService(db=async_db)
+        service = BaseService(InsideTotalsByCandidate, db=async_db)
         result = await service.get_by_id("C003")
 
         assert result.receipts is None

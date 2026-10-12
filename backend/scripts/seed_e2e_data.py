@@ -27,13 +27,10 @@ from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
 )
 from civic_lantern.db.session import JobSessionLocal
+from civic_lantern.jobs.ingestors import SPENDING_INGESTOR_NAMES
 
 CYCLE = 2024
 CANDIDATE_ID_PREFIX = "E2ESEED"
-SPENDING_INGESTOR_NAMES = [
-    "inside_totals_by_candidate",
-    "schedule_e_totals_by_candidate",
-]
 
 STATES = ["CA", "TX", "NY", "FL", "PA", "OH", "GA", "NC", "MI", "AZ"]
 PARTIES = ["DEM", "REP"]

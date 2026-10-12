@@ -1,16 +1,15 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, cast
+from typing import TYPE_CHECKING, Optional, Sequence, cast
 
 from sqlalchemy import CursorResult, distinct, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.ingestion_run import IngestionRun, IngestionRunStatus
-from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
-from civic_lantern.db.models.schedule_e_totals_by_candidate import (
-    ScheduleETotalsByCandidate,
-)
 from civic_lantern.services.data.base import BaseService
+
+if TYPE_CHECKING:
+    from civic_lantern.jobs.pipeline import Ingestion
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +118,9 @@ class IngestionRunService(BaseService[IngestionRun]):
                 f"Reset {result.rowcount} stale in-progress ingestion run(s)"
             )
 
-    async def get_ready_cycles(self, required_ingestors: list[str]) -> list[int]:
-        """Cycles where every ingestor in `required_ingestors` has EVER
-        succeeded, and both spending tables actually have rows for it.
+    async def get_ready_cycles(self, required: Sequence["Ingestion"]) -> list[int]:
+        """Cycles where every ingestion in `required` has EVER succeeded, and
+        each one's table actually has rows for it. Newest first.
 
         Deliberately built on `last_run_completed_at` (preserved across a
         later failure) rather than the latest run's `status` — a transient
@@ -131,43 +130,24 @@ class IngestionRunService(BaseService[IngestionRun]):
         untouched. The data-existence check separately guards the opposite
         case: a brand-new cycle whose first run "succeeds" with zero records
         (no FEC data yet) must not be reported as ready.
-
-        Hardcodes the two spending tables rather than taking a generic
-        ingestor->table mapping — there are only ever these two spending
-        ingestors (see SPENDING_INGESTOR_NAMES), so a generic mapping would
-        be pure indirection.
-
-        Newest first.
         """
+        names = [ingestion.entity for ingestion in required]
         succeeded_stmt = (
             select(IngestionRun.cycle)
             .where(
-                IngestionRun.ingestor_name.in_(required_ingestors),
+                IngestionRun.ingestor_name.in_(names),
                 IngestionRun.last_run_completed_at.isnot(None),
                 IngestionRun.cycle.isnot(None),
             )
             .group_by(IngestionRun.cycle)
-            .having(
-                func.count(distinct(IngestionRun.ingestor_name))
-                == len(required_ingestors)
-            )
+            .having(func.count(distinct(IngestionRun.ingestor_name)) == len(names))
         )
-        result = await self.db.execute(succeeded_stmt)
-        candidate_cycles = list(result.scalars().all())
-        if not candidate_cycles:
-            return []
-
-        inside_stmt = select(InsideTotalsByCandidate.cycle.distinct()).where(
-            InsideTotalsByCandidate.cycle.in_(candidate_cycles)
-        )
-        inside_cycles = set((await self.db.execute(inside_stmt)).scalars().all())
-
-        outside_stmt = select(ScheduleETotalsByCandidate.cycle.distinct()).where(
-            ScheduleETotalsByCandidate.cycle.in_(candidate_cycles)
-        )
-        outside_cycles = set((await self.db.execute(outside_stmt)).scalars().all())
-
-        ready = set(candidate_cycles) & inside_cycles & outside_cycles
-        # candidate_cycles already excludes None (the query below filters
-        # IngestionRun.cycle.isnot(None)); mypy can't know that statically.
+        ready = set((await self.db.execute(succeeded_stmt)).scalars().all())
+        for ingestion in required:
+            if not ready:
+                break
+            cycle_col = ingestion.model.cycle
+            with_rows = select(cycle_col.distinct()).where(cycle_col.in_(ready))
+            ready &= set((await self.db.execute(with_rows)).scalars().all())
+        # The query filters IngestionRun.cycle.isnot(None); mypy can't know that.
         return sorted((c for c in ready if c is not None), reverse=True)

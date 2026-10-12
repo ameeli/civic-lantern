@@ -1,4 +1,4 @@
-"""Integration tests for ScheduleETotalsByCandidateService."""
+"""Integration tests for upserting Schedule E totals by candidate."""
 
 from decimal import Decimal
 
@@ -11,9 +11,7 @@ from civic_lantern.db.models.enums import SupportOpposeEnum
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
 )
-from civic_lantern.services.data.schedule_e_totals_by_candidate import (
-    ScheduleETotalsByCandidateService,
-)
+from civic_lantern.services.data.base import BaseService
 
 
 async def _seed(session: AsyncSession, candidates: list, rows: list) -> None:
@@ -76,7 +74,7 @@ class TestScheduleETotalsByCandidateUpsert:
         assert oppose.total == Decimal("500000.00")
 
     async def test_upsert_updates_existing_record(self, async_db, seeded):
-        service = ScheduleETotalsByCandidateService(db=async_db)
+        service = BaseService(ScheduleETotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
                 {

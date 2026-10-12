@@ -173,7 +173,7 @@ class TestMainEntryPoint:
 @pytest.mark.asyncio
 class TestRunCancellable:
     """_run_cancellable wires SIGTERM to task cancellation instead of an
-    abrupt process kill, so BaseIngestor.run() gets a chance to record a
+    abrupt process kill, so run_ingestion() gets a chance to record a
     CANCELLED status before the process exits."""
 
     async def test_returns_result_normally(self):

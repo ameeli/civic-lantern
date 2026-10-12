@@ -1,40 +1,14 @@
-from typing import Any, Dict, List, Optional
-
-from civic_lantern.jobs.base_ingestor import BaseIngestor
-from civic_lantern.services.data.committee import CommitteeService
+from civic_lantern.db.models.committee import Committee
+from civic_lantern.jobs.pipeline import DateWindow, Ingestion
+from civic_lantern.schemas.committee import CommitteeIn
 from civic_lantern.services.fec_client import FECEndpoint
-from civic_lantern.utils.transformers import transform_committees
 
 COMMITTEES = FECEndpoint(name="committees", path="/committees/", sort=("committee_id",))
 
-
-class CommitteeIngestor(BaseIngestor):
-    """Ingests committee data from the FEC API."""
-
-    entity_name = "committees"
-
-    async def fetch(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        **kwargs: Any,
-    ) -> List[Dict[str, Any]]:
-        """Fetch committees from FEC API.
-
-        Pass start_date/end_date to filter by first file date explicitly.
-        Omitting either resumes from the last successful run's watermark, or
-        does a full unfiltered pull on the very first run (no watermark yet).
-        """
-        start_date, end_date = await self._resolve_dates(start_date, end_date)
-        if start_date:
-            kwargs["min_first_file_date"] = start_date
-        kwargs["max_first_file_date"] = end_date
-        return await self.client.fetch_all(COMMITTEES, **kwargs)
-
-    def transform(self, raw_data: List[Dict[str, Any]]) -> list:
-        """Validate raw committee dicts through CommitteeIn schema."""
-        return transform_committees(raw_data)
-
-    def create_service(self) -> CommitteeService:
-        """Return a CommitteeService wired to the current DB session."""
-        return CommitteeService(db=self.session)
+COMMITTEES_INGESTION = Ingestion(
+    entity="committees",
+    scope=DateWindow(min_param="min_first_file_date", max_param="max_first_file_date"),
+    endpoint=COMMITTEES,
+    schema=CommitteeIn,
+    model=Committee,
+)

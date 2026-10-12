@@ -33,9 +33,10 @@ class BaseService(Generic[T]):
         mapper = inspect(self.model)
         assert mapper is not None
         self.pk_name = mapper.primary_key[0].name
+        self.pk_names = [col.name for col in mapper.primary_key]
 
         if not hasattr(self, "index_elements"):
-            self.index_elements = [self.pk_name]
+            self.index_elements = list(self.pk_names)
 
     def _apply_filters(self, stmt: Any, **filters: Any) -> Any:
         """Apply equality filters to a select statement, skipping None values."""
@@ -150,7 +151,7 @@ class BaseService(Generic[T]):
         }
 
         for row in batch:
-            row_id = row.get(self.pk_name, "UNKNOWN")
+            row_id = self._row_key(row)
 
             try:
                 async with self.db.begin_nested():
@@ -167,6 +168,13 @@ class BaseService(Generic[T]):
                 )
 
         return stats
+
+    def _row_key(self, row: dict) -> Any:
+        """The row's primary key for error reports: a scalar for a single-column
+        key, a tuple of plain values (enums as .value) for a composite one."""
+        values = [row.get(name, "UNKNOWN") for name in self.pk_names]
+        values = [getattr(v, "value", v) for v in values]
+        return values[0] if len(values) == 1 else tuple(values)
 
     async def _execute_upsert(self, values: List[dict]) -> tuple[int, int]:
         """Constructs and executes the PostgreSQL upsert statement.

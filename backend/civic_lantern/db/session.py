@@ -21,12 +21,12 @@ AsyncSessionLocal = async_sessionmaker(
 # The nightly ingestion job is a batch process, not a request server: it
 # alternates brief DB reads/writes with long DB-free stretches (paginated,
 # rate-limited FEC API pulls that can run for hours on a full historical
-# pull — see BaseIngestor._resolve_dates). Sharing the pooled `engine` above
+# pull — see pipeline._date_window_params). Sharing the pooled `engine` above
 # would keep a connection checked out idle for each such stretch, which
 # blocks Neon's (or any autosuspend-on-idle Postgres's) ability to suspend
 # compute and burns billed compute time for no reason. NullPool closes each
 # connection as soon as it's checked back in instead of holding it for
-# reuse, so a properly-ended transaction (see BaseIngestor._resolve_dates)
+# reuse, so a properly-ended transaction (see pipeline._date_window_params)
 # actually releases the compute, not just the pool slot.
 job_engine = create_async_engine(
     settings.DATABASE_URL_ASYNC,

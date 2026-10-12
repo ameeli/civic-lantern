@@ -1,8 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
+from civic_lantern.jobs.ingestors.inside_totals_by_candidate import (
+    INSIDE_TOTALS_INGESTION,
+)
+from civic_lantern.jobs.pipeline import combine, validate
 from civic_lantern.schemas.inside_totals_by_candidate import InsideTotalsByCandidateIn
-from civic_lantern.utils.transformers import transform_inside_totals_by_candidate
 
 VALID_RAW = {
     "candidate_id": "P00009423",
@@ -42,6 +45,10 @@ class TestInsideTotalsByCandidateIn:
         )
         assert result.receipts is None
         assert result.disbursements is None
+
+
+def transform_inside_totals_by_candidate(raw):
+    return combine(validate(raw, INSIDE_TOTALS_INGESTION), INSIDE_TOTALS_INGESTION)
 
 
 @pytest.mark.unit
@@ -94,7 +101,7 @@ class TestTransformInsideTotalsByCandidate:
         ]
         results = transform_inside_totals_by_candidate(raw)
         assert len(results) == 1
-        assert any("missing candidate_id" in r.message for r in caplog.records)
+        assert any("candidate_id" in r.message for r in caplog.records)
 
     def test_empty_input_returns_empty(self):
         assert transform_inside_totals_by_candidate([]) == []
