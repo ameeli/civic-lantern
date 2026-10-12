@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
+from civic_lantern.schemas.inside_totals_by_candidate import InsideTotalsByCandidateIn
 from civic_lantern.services.data.base import BaseService
 
 
@@ -69,12 +70,12 @@ class TestInsideTotalsByCandidateUpsert:
         service = BaseService(InsideTotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
-                {
-                    "candidate_id": "C001",
-                    "cycle": 2024,
-                    "receipts": Decimal("600000.00"),
-                    "disbursements": Decimal("580000.00"),
-                }
+                InsideTotalsByCandidateIn(
+                    candidate_id="C001",
+                    cycle=2024,
+                    receipts=600000.00,
+                    disbursements=580000.00,
+                )
             ]
         )
 
@@ -88,12 +89,12 @@ class TestInsideTotalsByCandidateUpsert:
         service = BaseService(InsideTotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
-                {
-                    "candidate_id": "C001",
-                    "cycle": 2022,
-                    "receipts": Decimal("200000.00"),
-                    "disbursements": Decimal("190000.00"),
-                }
+                InsideTotalsByCandidateIn(
+                    candidate_id="C001",
+                    cycle=2022,
+                    receipts=200000.00,
+                    disbursements=190000.00,
+                )
             ]
         )
         assert stats["inserted"] == 1

@@ -11,6 +11,9 @@ from civic_lantern.db.models.enums import SupportOpposeEnum
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
 )
+from civic_lantern.schemas.schedule_e_totals_by_candidate import (
+    ScheduleETotalsByCandidateIn,
+)
 from civic_lantern.services.data.base import BaseService
 
 
@@ -77,12 +80,12 @@ class TestScheduleETotalsByCandidateUpsert:
         service = BaseService(ScheduleETotalsByCandidate, db=async_db)
         stats = await service.upsert_batch(
             [
-                {
-                    "candidate_id": "P001",
-                    "cycle": 2024,
-                    "support_oppose_indicator": "S",
-                    "total": Decimal("3000000.00"),
-                }
+                ScheduleETotalsByCandidateIn(
+                    candidate_id="P001",
+                    cycle=2024,
+                    support_oppose_indicator=SupportOpposeEnum.SUPPORT,
+                    total=3000000.00,
+                )
             ]
         )
         assert stats["updated"] == 1

@@ -77,6 +77,7 @@ class TestUpsertBatch:
 
         c1 = CandidateIn(candidate_id="C_UPDATE_TIME", name="Original")
         await service.upsert_batch([c1])
+        await async_db.commit()  # now() is fixed per transaction
         original = await service.get_by_id("C_UPDATE_TIME")
         original_updated_at = original.updated_at
 
@@ -143,9 +144,10 @@ class TestUpsertBatch:
         service = CandidateService(db=async_db)
 
         batch = [
-            {"candidate_id": "C_VALID_1", "name": "Valid One"},
-            {"candidate_id": "C_INVALID"},
-            {"candidate_id": "C_VALID_2", "name": "Valid Two"},
+            CandidateIn(candidate_id="C_VALID_1", name="Valid One"),
+            # Skips validation, so the database rejects the missing name.
+            CandidateIn.model_construct(candidate_id="C_INVALID"),
+            CandidateIn(candidate_id="C_VALID_2", name="Valid Two"),
         ]
 
         stats = await service.upsert_batch(batch)

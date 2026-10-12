@@ -155,6 +155,8 @@ async def run_ingestion(
             )
             return RunOutcome(status, error=partial_note)
 
+        # Not committed yet: complete_run commits these rows with the run status,
+        # so a failure from here on rolls all of them back.
         stats = await BaseService(ingestion.model, db=session).upsert_batch(rows)
         logger.info(
             f"{ingestion.entity} complete: "

@@ -12,8 +12,8 @@ import pytest
 import respx
 from aiolimiter import AsyncLimiter
 from alembic.config import Config
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy import create_engine, event, select, text
+from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
@@ -340,3 +340,46 @@ class TestManualRun:
 
         assert code == 0
         assert _count(unmigrated_db, "inside_totals_by_candidate") == 0
+
+
+@pytest.fixture
+def fail_second_committee_batch():
+    """Raise mid-upsert, as a dropped connection would, on the second batch."""
+    inserts = []
+
+    def on_execute(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("INSERT INTO committees"):
+            inserts.append(statement)
+            if len(inserts) == 2:
+                raise RuntimeError("connection reset by peer")
+
+    event.listen(Engine, "before_cursor_execute", on_execute)
+    yield
+    event.remove(Engine, "before_cursor_execute", on_execute)
+
+
+@pytest.mark.integration
+class TestUpsertFailure:
+    @respx.mock
+    def test_a_run_failing_mid_upsert_leaves_the_previous_data_whole(
+        self, migrated_db, run_cli, request
+    ):
+        def committees(version: str) -> list:
+            return [
+                {"committee_id": f"C{i:04d}", "name": f"{version} {i}"}
+                for i in range(1200)  # three upsert batches
+            ]
+
+        argv = ["--entities", "committees"]
+        _mock_fec(**{"/committees/": {"rows": committees("old")}})
+        assert run_cli(migrated_db, argv) == 0
+
+        respx.clear()
+        _mock_fec(**{"/committees/": {"rows": committees("new")}})
+        request.getfixturevalue("fail_second_committee_batch")
+        code = run_cli(migrated_db, argv)
+
+        assert code == 1
+        assert _runs(migrated_db) == {("committees", None): IngestionRunStatus.FAILED}
+        names = _query(migrated_db, text("SELECT name FROM committees"))
+        assert {name.split()[0] for (name,) in names} == {"old"}

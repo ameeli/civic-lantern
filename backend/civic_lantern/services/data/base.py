@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Generic, List, Type, TypedDict, TypeVar, Union, cast
+from typing import Any, Dict, Generic, List, Sequence, Type, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy import exc, func, inspect, literal_column, or_, select
@@ -16,13 +16,6 @@ class UpsertStats(TypedDict):
     inserted: int
     updated: int
     errors: int
-    failed_ids: List[Any]
-
-
-class _BatchStats(TypedDict):
-    inserted: int
-    updated: int
-    error_count: int
     failed_ids: List[Any]
 
 
@@ -73,42 +66,34 @@ class BaseService(Generic[T]):
         }
 
     async def upsert_batch(
-        self, data: Union[List[dict], List[BaseModel]], batch_size: int = 500
+        self, items: Sequence[BaseModel], batch_size: int = 500
     ) -> UpsertStats:
-        """
-        Generic upsert. Tries to insert in batches.
-        If a batch fails, falls back to row-by-row processing.
-        """
-        if not data:
-            return {"inserted": 0, "updated": 0, "errors": 0, "failed_ids": []}
+        """Upsert `items` on the full primary key, in batches, keeping only the
+        fields that are table columns.
 
-        rows: List[dict]
-        if isinstance(data[0], BaseModel):
-            # Callers always pass a homogeneous list (all dicts or all
-            # BaseModel), never mixed - the isinstance check on the first
-            # item establishes that for the whole list.
-            model_items = cast(List[BaseModel], data)
-            table_columns = {col.name for col in self.model.__table__.columns}
-            rows = [
-                {k: v for k, v in item.model_dump().items() if k in table_columns}
-                for item in model_items
-            ]
-        else:
-            rows = cast(List[dict], data)
-
+        Each batch runs in a savepoint; a batch that fails is rolled back and
+        retried row by row, so only its bad rows are skipped (and reported in
+        `failed_ids`). Doesn't commit: the caller owns the transaction, so a
+        later failure can roll back every batch.
+        """
         stats: UpsertStats = {
             "inserted": 0,
             "updated": 0,
             "errors": 0,
             "failed_ids": [],
         }
+        table_columns = {col.name for col in self.model.__table__.columns}
+        rows = [
+            {k: v for k, v in item.model_dump().items() if k in table_columns}
+            for item in items
+        ]
 
         for i in range(0, len(rows), batch_size):
             batch = rows[i : i + batch_size]
 
             try:
-                inserted, updated = await self._execute_upsert(batch)
-
+                async with self.db.begin_nested():
+                    inserted, updated = await self._execute_upsert(batch)
                 stats["inserted"] += inserted
                 stats["updated"] += updated
                 logger.debug(
@@ -117,20 +102,15 @@ class BaseService(Generic[T]):
                 )
 
             except exc.SQLAlchemyError as e:
-                await self.db.rollback()
                 logger.warning(
                     f"Batch failed for {self.model.__name__} (idx {i}). "
                     f"Switching to row-by-row. Error: {e}"
                 )
-
                 batch_stats = await self._process_batch_individually(batch)
-
                 stats["inserted"] += batch_stats["inserted"]
                 stats["updated"] += batch_stats["updated"]
-                stats["errors"] += batch_stats["error_count"]
+                stats["errors"] += batch_stats["errors"]
                 stats["failed_ids"].extend(batch_stats["failed_ids"])
-
-            await self.db.commit()
 
         logger.info(
             f"Upsert complete. "
@@ -141,12 +121,12 @@ class BaseService(Generic[T]):
 
         return stats
 
-    async def _process_batch_individually(self, batch: List[dict]) -> _BatchStats:
-        """Helper to process a failed batch one row at a time."""
-        stats: _BatchStats = {
+    async def _process_batch_individually(self, batch: List[dict]) -> UpsertStats:
+        """Upsert a failed batch one row at a time, each in its own savepoint."""
+        stats: UpsertStats = {
             "inserted": 0,
             "updated": 0,
-            "error_count": 0,
+            "errors": 0,
             "failed_ids": [],
         }
 
@@ -161,7 +141,7 @@ class BaseService(Generic[T]):
                 stats["updated"] += updated
 
             except Exception as e:
-                stats["error_count"] += 1
+                stats["errors"] += 1
                 stats["failed_ids"].append(row_id)
                 logger.error(
                     f"Failed {self.model.__name__} [{row_id}]: {type(e).__name__} - {e}"
