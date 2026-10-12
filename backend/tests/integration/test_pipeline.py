@@ -83,12 +83,13 @@ class TestDateWindowScope:
         mock_dt.now.return_value = today
         route = _mock(client, COMMITTEES_PATH, [[{"committee_id": "C1", "name": "A"}]])
 
-        stats = await run_ingestion(COMMITTEES_INGESTION, client, async_db)
+        outcome = await run_ingestion(COMMITTEES_INGESTION, client, async_db)
 
         params = route.calls[0].request.url.params
         assert params["max_first_file_date"] == "2025-06-15"
         assert "min_first_file_date" not in params
-        assert stats["inserted"] == 1
+        assert outcome.status == IngestionRunStatus.SUCCESS
+        assert outcome.stats["inserted"] == 1
         run = await _run_row(async_db, "committees")
         assert run.status == IngestionRunStatus.SUCCESS
         assert run.cycle is None
@@ -233,27 +234,30 @@ class TestRunOutcomes:
         rows = [_ie(f"P{i:02d}") for i in range(25)]
         _mock(client, SCHEDULE_E_PATH, [rows])
 
-        stats = await run_ingestion(
+        outcome = await run_ingestion(
             SCHEDULE_E_TOTALS_INGESTION, client, async_db, cycle=2024
         )
 
-        assert stats["errors"] == 25
+        assert outcome.status == IngestionRunStatus.PARTIAL_SUCCESS
+        assert outcome.stats["errors"] == 25
         run = await _run_row(async_db, "schedule_e_totals_by_candidate")
         assert run.status == IngestionRunStatus.PARTIAL_SUCCESS
+        assert outcome.error == run.error_message
         assert run.error_message.startswith(
             "25 row(s) failed to upsert: [('P00', 2024, 'S'), ('P01', 2024, 'S'),"
         )
         assert run.error_message.endswith("(+5 more)")
 
     @respx.mock
-    async def test_empty_result_is_a_success_returning_none(self, async_db, client):
+    async def test_empty_result_is_a_success_without_stats(self, async_db, client):
         _mock(client, SCHEDULE_E_PATH, [[]])
 
-        result = await run_ingestion(
+        outcome = await run_ingestion(
             SCHEDULE_E_TOTALS_INGESTION, client, async_db, cycle=2024
         )
 
-        assert result is None
+        assert outcome.status == IngestionRunStatus.SUCCESS
+        assert not outcome.wrote_rows
         run = await _run_row(async_db, "schedule_e_totals_by_candidate")
         assert run.status == IngestionRunStatus.SUCCESS
         assert run.last_run_completed_at is not None
@@ -298,9 +302,9 @@ class TestRunOutcomes:
         ]
         _mock(client, COMMITTEES_PATH, [rows])
 
-        stats = await run_ingestion(COMMITTEES_INGESTION, client, async_db)
+        outcome = await run_ingestion(COMMITTEES_INGESTION, client, async_db)
 
-        assert stats["inserted"] == 1
+        assert outcome.stats["inserted"] == 1
         async_db.expunge_all()
         stored = await async_db.get(Committee, "C1")
         assert stored.name == "First"

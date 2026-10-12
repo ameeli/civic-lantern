@@ -1,18 +1,19 @@
 import logging
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from civic_lantern.core.cycles import active_cycles
-from civic_lantern.db.session import JobSessionLocal
+from civic_lantern.db.models.ingestion_run import IngestionRunStatus
 from civic_lantern.jobs.ingestors import (
     DATE_WINDOW_INGESTIONS,
     INGESTIONS,
     INGESTIONS_BY_NAME,
     SPENDING_INGESTOR_NAMES,
 )
-from civic_lantern.jobs.pipeline import run_ingestion
-from civic_lantern.services.data.base import UpsertStats
+from civic_lantern.jobs.pipeline import RunOutcome, run_ingestion
 from civic_lantern.services.data.ingestion_run import IngestionRunService
 from civic_lantern.services.fec_client import FECClient
 
@@ -28,32 +29,78 @@ SPENDING_ENTITIES = SPENDING_INGESTOR_NAMES
 # hours under the FEC 900/hr rate limit. Still self-heals well before the
 # next night's scheduled trigger.
 OVERLAP_TIMEOUT_MINUTES = 720
-# Result key for a failed MV refresh, so the CLI counts it as a failure.
-MV_REFRESH_RESULT_KEY = "refresh_spending_stats"
+# How a failed MV refresh is named in a RunReport.
+MV_REFRESH_LABEL = "refresh_spending_stats"
+
+RunKey = Tuple[str, Optional[int]]
+
+
+@dataclass
+class RunReport:
+    """What one manager call did: each run's outcome by (entity, cycle), in run
+    order, plus whether the overlap guard skipped it and any MV refresh error."""
+
+    outcomes: Dict[RunKey, RunOutcome] = field(default_factory=dict)
+    skipped: bool = False
+    mv_refresh_error: Optional[str] = None
+
+    @property
+    def failed(self) -> List[str]:
+        """Labels of the failed runs, plus the MV refresh if it failed."""
+        failed = [
+            _label(key)
+            for key, outcome in self.outcomes.items()
+            if outcome.status == IngestionRunStatus.FAILED
+        ]
+        if self.mv_refresh_error is not None:
+            failed.append(MV_REFRESH_LABEL)
+        return failed
+
+    @property
+    def needs_mv_refresh(self) -> bool:
+        """The MVs read only spending tables: refresh if a spending run wrote rows."""
+        return any(
+            entity in SPENDING_INGESTOR_NAMES and outcome.wrote_rows
+            for (entity, _), outcome in self.outcomes.items()
+        )
+
+    def summary(self) -> str:
+        """One line per run (and the MV refresh if it failed), for the CLI log."""
+        if self.skipped:
+            return "Ingestion skipped: another run is in progress."
+        if not self.outcomes:
+            return "Ingestion summary: nothing ran."
+        lines = [
+            (_label(key), outcome.status.value, _detail(outcome))
+            for key, outcome in self.outcomes.items()
+        ]
+        if self.mv_refresh_error is not None:
+            lines.append((MV_REFRESH_LABEL, "failed", self.mv_refresh_error))
+        width = max(len(label) for label, _, _ in lines)
+        rows = [
+            f"  {label:<{width}}  {status:<15}  {detail}".rstrip()
+            for label, status, detail in lines
+        ]
+        return "\n".join(["Ingestion summary:", *rows])
 
 
 class IngestionManager:
-    """Owns the shared FECClient lifecycle and routes to ingestors.
+    """Runs ingestions by name, in dependency order, with the given FEC client
+    and session factory.
 
     Usage::
 
-        async with IngestionManager() as manager:
-            await manager.ingest_batch()                             # all entities
-            await manager.ingest_batch(["candidates"])              # subset
-            await manager.ingest("candidates", start_date=...)  # single entity
+        manager = IngestionManager(client, JobSessionLocal)
+        await manager.run_nightly()                       # the nightly routine
+        await manager.ingest_batch(["candidates"])        # a subset
+        await manager.ingest("candidates", start_date=...)  # one entity
     """
 
-    def __init__(self) -> None:
-        self._client: Optional[FECClient] = None
-
-    async def __aenter__(self) -> "IngestionManager":
-        self._client = FECClient()
-        await self._client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        if self._client:
-            await self._client.__aexit__(exc_type, exc_val, exc_tb)
+    def __init__(
+        self, client: FECClient, sessions: async_sessionmaker[AsyncSession]
+    ) -> None:
+        self._client = client
+        self._sessions = sessions
 
     async def ingest(
         self,
@@ -61,19 +108,13 @@ class IngestionManager:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         cycle: Optional[int] = None,
-    ) -> Optional[UpsertStats]:
-        """Run one entity's ingestion by name."""
-        if self._client is None:
-            raise RuntimeError(
-                "IngestionManager must be used as an async context manager. "
-                "Use 'async with IngestionManager() as manager:'"
-            )
-
+    ) -> RunOutcome:
+        """Run one entity's ingestion by name; raises if the run fails."""
         ingestion = INGESTIONS_BY_NAME.get(entity)
         if ingestion is None:
             raise ValueError(_unknown_entity(entity))
 
-        async with JobSessionLocal() as session:
+        async with self._sessions() as session:
             return await run_ingestion(
                 ingestion,
                 self._client,
@@ -90,43 +131,24 @@ class IngestionManager:
         end_date: Optional[str] = None,
         *,
         cycle: Optional[int] = None,
-        skip_mv_refresh: bool = False,
-    ) -> Dict[str, Any]:
-        """Run ingestors for the given entities, or all if not specified.
+    ) -> RunReport:
+        """Run the given entities, or all if not specified, in dependency
+        order, then refresh the MVs if needed.
 
-        Executes in dependency order. Continues on failure — a failed
-        entity is logged and recorded but does not block subsequent ones.
-
-        `skip_mv_refresh` lets a caller defer the MV refresh across several
-        calls (e.g. run_nightly()'s per-cycle loop) so it happens once
-        overall rather than once per call — the MVs span every cycle, so
-        refreshing after each individual cycle is redundant work.
+        Continues on failure — a failed entity is logged and recorded as
+        FAILED in the report but does not block subsequent ones.
         """
         unknown = [e for e in entities or [] if e not in INGESTIONS_BY_NAME]
         if unknown:
             raise ValueError(_unknown_entity(unknown[0]))
         targets = [i.entity for i in INGESTIONS if not entities or i.entity in entities]
 
-        results: Dict[str, Any] = {}
+        report = RunReport()
+        await self._run_all(report, targets, cycle, start_date, end_date)
+        await self._refresh_if_needed(report)
+        return report
 
-        for name in targets:
-            try:
-                results[name] = await self.ingest(name, start_date, end_date, cycle)
-            except Exception as e:
-                logger.error(f"Entity '{name}' failed: {e}", exc_info=True)
-                results[name] = {"error": str(e)}
-
-        # Refresh MVs if any spending source ingestor ran and succeeded.
-        ran = set(SPENDING_INGESTOR_NAMES) & set(targets)
-        any_succeeded = any(
-            results.get(name) and "error" not in results.get(name, {}) for name in ran
-        )
-        if any_succeeded and not skip_mv_refresh:
-            await self._refresh_recording_errors(results)
-
-        return results
-
-    async def run_nightly(self) -> Dict[str, Any]:
+    async def run_nightly(self) -> RunReport:
         """Run the full nightly ingestion routine.
 
         Date-windowed entities (committees, candidates) run once, resuming
@@ -135,33 +157,23 @@ class IngestionManager:
         rather than date-windowed. Guards against overlapping runs: a recent
         in-progress run blocks this one; a stale one self-heals first.
         """
-        async with JobSessionLocal() as session:
+        async with self._sessions() as session:
             guard = IngestionRunService(session)
             if await guard.has_active_run(OVERLAP_TIMEOUT_MINUTES):
                 logger.warning("Overlap guard: a run is already in progress, skipping.")
-                return {"skipped": "overlap_guard"}
+                return RunReport(skipped=True)
             await guard.reset_stale_runs(OVERLAP_TIMEOUT_MINUTES)
 
-        results: Dict[str, Any] = {}
-        results.update(await self.ingest_batch(DATE_WINDOWED_ENTITIES))
-
-        any_spending_succeeded = False
+        report = RunReport()
+        await self._run_all(report, DATE_WINDOWED_ENTITIES)
         for cycle in active_cycles():
-            cycle_results = await self.ingest_batch(
-                SPENDING_ENTITIES, cycle=cycle, skip_mv_refresh=True
-            )
-            results.update({f"{name}:{cycle}": r for name, r in cycle_results.items()})
-            any_spending_succeeded = any_spending_succeeded or any(
-                r and "error" not in r for r in cycle_results.values()
-            )
+            await self._run_all(report, SPENDING_ENTITIES, cycle)
 
         # One refresh for the whole run, not once per active cycle — the MVs
         # span every cycle, so refreshing after each is redundant work that
         # grows every time another cycle becomes active.
-        if any_spending_succeeded:
-            await self._refresh_recording_errors(results)
-
-        return results
+        await self._refresh_if_needed(report)
+        return report
 
     async def refresh_spending_stats(self) -> None:
         """Refresh candidate and election spending materialized views.
@@ -171,7 +183,7 @@ class IngestionManager:
         CONCURRENTLY allows reads to continue during each refresh. Raises on
         failure; closing the session rolls back.
         """
-        async with JobSessionLocal() as session:
+        async with self._sessions() as session:
             await session.execute(
                 text(
                     "REFRESH MATERIALIZED VIEW CONCURRENTLY "
@@ -187,13 +199,53 @@ class IngestionManager:
             await session.commit()
             logger.info("✅ Materialized views refreshed.")
 
-    async def _refresh_recording_errors(self, results: Dict[str, Any]) -> None:
-        """Refresh the MVs, recording a failure in `results` instead of raising."""
+    async def _run_all(
+        self,
+        report: RunReport,
+        entities: Sequence[str],
+        cycle: Optional[int] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> None:
+        """Run each entity in order, recording a raised error as FAILED."""
+        for name in entities:
+            try:
+                outcome = await self.ingest(name, start_date, end_date, cycle)
+            except Exception as e:
+                logger.error(
+                    f"Entity '{_label((name, cycle))}' failed: {e}", exc_info=True
+                )
+                outcome = RunOutcome(IngestionRunStatus.FAILED, error=str(e))
+            report.outcomes[(name, cycle)] = outcome
+
+    async def _refresh_if_needed(self, report: RunReport) -> None:
+        """Refresh the MVs if the report calls for it, recording a failure in
+        the report instead of raising."""
+        if not report.needs_mv_refresh:
+            return
         try:
             await self.refresh_spending_stats()
         except Exception as e:
             logger.error(f"Failed to refresh materialized views: {e}", exc_info=True)
-            results[MV_REFRESH_RESULT_KEY] = {"error": str(e)}
+            report.mv_refresh_error = str(e)
+
+
+def _label(key: RunKey) -> str:
+    entity, cycle = key
+    return entity if cycle is None else f"{entity}:{cycle}"
+
+
+def _detail(outcome: RunOutcome) -> str:
+    parts = []
+    if outcome.stats is not None:
+        stats = outcome.stats
+        parts.append(
+            f"inserted={stats['inserted']} updated={stats['updated']} "
+            f"errors={stats['errors']}"
+        )
+    if outcome.error:
+        parts.append(outcome.error)
+    return "  ".join(parts)
 
 
 def _unknown_entity(entity: str) -> str:

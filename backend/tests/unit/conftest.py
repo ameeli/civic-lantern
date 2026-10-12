@@ -25,10 +25,16 @@ def mock_client() -> AsyncMock:
 
 
 @pytest.fixture
-def manager(mock_client: AsyncMock) -> IngestionManager:
-    m = IngestionManager()
-    m._client = mock_client
-    return m
+def sessions(mock_session: AsyncMock) -> MagicMock:
+    """A session factory whose every session is `mock_session`."""
+    factory = MagicMock()
+    factory.return_value.__aenter__.return_value = mock_session
+    return factory
+
+
+@pytest.fixture
+def manager(mock_client: AsyncMock, sessions: MagicMock) -> IngestionManager:
+    return IngestionManager(mock_client, sessions)
 
 
 # ---------------------------------------------------------------------------

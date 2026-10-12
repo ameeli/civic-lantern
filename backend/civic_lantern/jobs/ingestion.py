@@ -3,9 +3,12 @@ import asyncio
 import logging
 import signal
 import sys
-from typing import Any, Awaitable, Dict, List, Optional, Sequence, TypeVar
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Awaitable, List, Optional, Sequence, TypeVar
 
-from civic_lantern.jobs.manager import IngestionManager
+from civic_lantern.db.session import JobSessionLocal
+from civic_lantern.jobs.manager import IngestionManager, RunReport
+from civic_lantern.services.fec_client import FECClient
 from civic_lantern.utils.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -13,12 +16,19 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+@asynccontextmanager
+async def _manager() -> AsyncIterator[IngestionManager]:
+    """The production manager: a live FECClient and the job session factory."""
+    async with FECClient() as client:
+        yield IngestionManager(client, JobSessionLocal)
+
+
 async def ingest(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     entities: Optional[List[str]] = None,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> RunReport:
     """Run a single ingestion pass over the given entities (ad hoc / manual use).
 
     Args:
@@ -30,16 +40,16 @@ async def ingest(
             for the per-cycle ingestions.
 
     Returns:
-        Dict mapping entity names to their ingestion stats (or error info).
+        The RunReport: each run's outcome and any MV refresh error.
     """
-    async with IngestionManager() as manager:
+    async with _manager() as manager:
         return await manager.ingest_batch(entities, start_date, end_date, **kwargs)
 
 
-async def run_nightly() -> Dict[str, Any]:
+async def run_nightly() -> RunReport:
     """Run the full nightly routine: date-windowed entities once, spending
     entities once per active cycle. See IngestionManager.run_nightly()."""
-    async with IngestionManager() as manager:
+    async with _manager() as manager:
         return await manager.run_nightly()
 
 
@@ -92,19 +102,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         if args.entities:
             entities = [e.strip() for e in args.entities.split(",") if e.strip()]
             kwargs = {"cycle": args.cycle} if args.cycle else {}
-            results = asyncio.run(_run_cancellable(ingest(entities=entities, **kwargs)))
+            report = asyncio.run(_run_cancellable(ingest(entities=entities, **kwargs)))
         else:
-            results = asyncio.run(_run_cancellable(run_nightly()))
+            report = asyncio.run(_run_cancellable(run_nightly()))
     except asyncio.CancelledError:
         sys.exit(1)
 
-    failed = [
-        name
-        for name, result in results.items()
-        if isinstance(result, dict) and "error" in result
-    ]
-    if failed:
-        logger.error(f"Ingestion completed with failures: {failed}")
+    logger.info(report.summary())
+    if report.failed:
+        logger.error(f"Ingestion completed with failures: {report.failed}")
         sys.exit(1)
 
 
