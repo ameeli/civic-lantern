@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -14,6 +14,10 @@ from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.db.models.inside_totals_by_candidate import InsideTotalsByCandidate
 from civic_lantern.db.models.schedule_e_totals_by_candidate import (
     ScheduleETotalsByCandidate,
+)
+from civic_lantern.schemas.candidate_spending import (
+    CandidateInfo,
+    CandidateSpendingSchema,
 )
 from civic_lantern.services.data.candidate_spending import CandidateSpendingService
 
@@ -334,6 +338,33 @@ class TestGetList:
         assert c001.candidate is not None
         assert c001.candidate.name == "Alice"
         assert c001.candidate.state == "CA"
+
+    async def test_candidate_lookup_selects_only_candidate_info_columns(
+        self, db_with_mv, standard_seed_data
+    ):
+        """The candidate lookup fetches only what CandidateInfo serializes."""
+        statements: list[str] = []
+
+        def capture(conn, cursor, statement, *args):
+            statements.append(statement)
+
+        sync_engine = db_with_mv.bind.sync_engine
+        event.listen(sync_engine, "before_cursor_execute", capture)
+        try:
+            service = CandidateSpendingService(db=db_with_mv)
+            result = await service.get_list(sort_by="total_spending", order="desc")
+        finally:
+            event.remove(sync_engine, "before_cursor_execute", capture)
+
+        lookup = next(s for s in statements if "FROM candidates" in s)
+        selected = lookup.split("SELECT", 1)[1].split("FROM", 1)[0]
+        columns = {c.strip().removeprefix("candidates.") for c in selected.split(",")}
+        assert columns == set(CandidateInfo.model_fields)
+
+        c001 = next(r for r in result["items"] if r.candidate_id == "C001")
+        assert CandidateSpendingSchema.model_validate(c001).candidate == CandidateInfo(
+            candidate_id="C001", name="Alice", state="CA", party="DEM"
+        )
 
     @pytest.mark.parametrize(
         "sort_key",

@@ -8,8 +8,13 @@ from civic_lantern.db.models.enums import OfficeTypeEnum
 from civic_lantern.db.models.mv_candidate_spending_summary import (
     MvCandidateSpendingSummary,
 )
-from civic_lantern.schemas.candidate_spending import SpendingSortBy
+from civic_lantern.schemas.candidate_spending import CandidateInfo, SpendingSortBy
 from civic_lantern.services.data.base import BaseService
+
+# The columns CandidateInfo serializes, rather than the whole Candidate row.
+_CANDIDATE_INFO_COLUMNS = [
+    getattr(Candidate, name) for name in CandidateInfo.model_fields
+]
 
 
 def _total_spending_expr() -> Any:
@@ -63,15 +68,18 @@ class CandidateSpendingService(BaseService[MvCandidateSpendingSummary]):
 
         MvCandidateSpendingSummary is on ViewBase so it cannot carry a SQLAlchemy
         relationship to Candidate (different declarative registry). A secondary
-        IN query keeps this to two round-trips per page.
+        IN query keeps this to two round-trips per page. Rows carry only the
+        CandidateInfo columns, which is all the response serializes.
         """
         if not items:
             return
         candidate_ids = [item.candidate_id for item in items]
         result = await self.db.execute(
-            select(Candidate).where(Candidate.candidate_id.in_(candidate_ids))
+            select(*_CANDIDATE_INFO_COLUMNS).where(
+                Candidate.candidate_id.in_(candidate_ids)
+            )
         )
-        candidate_map = {c.candidate_id: c for c in result.scalars().all()}
+        candidate_map = {c.candidate_id: c for c in result.all()}
         for item in items:
             item.candidate = candidate_map.get(item.candidate_id)
 
