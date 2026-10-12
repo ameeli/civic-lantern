@@ -195,7 +195,8 @@ the ingestion pipeline only.
    invalid row that has its key), combine rows by primary key, and upsert via
    `BaseService` (`INSERT ... ON CONFLICT DO UPDATE` on the full primary key,
    batched with row-by-row fallback — see `BaseService.upsert_batch`). Each
-   run is recorded in `ingestion_runs`.
+   run is recorded in `ingestion_runs`; its rows commit in the same
+   transaction as its final status, so a failed run writes none of them.
 4. `IngestionManager` (`jobs/manager.py`) is given an `FECClient` and a
    session factory (the CLI, `jobs/ingestion.py`, builds the live ones) and runs
    the declarations in `INGESTIONS` order (`jobs/ingestors/__init__.py`),
