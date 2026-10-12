@@ -23,6 +23,7 @@ from civic_lantern.db.models import Base
 from civic_lantern.db.models.candidate import Candidate
 from civic_lantern.db.models.ingestion_run import IngestionRun, IngestionRunStatus
 from civic_lantern.jobs.ingestion import main
+from civic_lantern.services.data.base import BaseService
 from civic_lantern.services.fec_client import FECClient
 
 # Where the CLI builds its FECClient and session factory.
@@ -382,4 +383,62 @@ class TestUpsertFailure:
         assert code == 1
         assert _runs(migrated_db) == {("committees", None): IngestionRunStatus.FAILED}
         names = _query(migrated_db, text("SELECT name FROM committees"))
+        assert {name.split()[0] for (name,) in names} == {"old"}
+
+
+@pytest.fixture
+def drop_connection_before_second_committee_batch(migrated_db):
+    """Terminate the ingestion's backend just before its second batch INSERT."""
+    inserts = []
+
+    def on_execute(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("INSERT INTO committees"):
+            inserts.append(statement)
+            if len(inserts) == 2:
+                _query(
+                    migrated_db,
+                    text(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = current_database() "
+                        "AND pid <> pg_backend_pid()"
+                    ),
+                )
+
+    event.listen(Engine, "before_cursor_execute", on_execute)
+    yield
+    event.remove(Engine, "before_cursor_execute", on_execute)
+
+
+@pytest.mark.integration
+class TestDroppedConnection:
+    @respx.mock
+    def test_a_dropped_connection_fails_the_run_without_row_by_row_retries(
+        self, migrated_db, run_cli, request, mocker
+    ):
+        def committees(version: str) -> list:
+            return [
+                {"committee_id": f"C{i:04d}", "name": f"{version} {i}"}
+                for i in range(1200)  # three upsert batches
+            ]
+
+        argv = ["--entities", "committees"]
+        _mock_fec(**{"/committees/": {"rows": committees("old")}})
+        assert run_cli(migrated_db, argv) == 0
+
+        respx.clear()
+        _mock_fec(**{"/committees/": {"rows": committees("new")}})
+        row_by_row = mocker.spy(BaseService, "_process_batch_individually")
+        request.getfixturevalue("drop_connection_before_second_committee_batch")
+        code = run_cli(migrated_db, argv)
+
+        assert code == 1
+        status, error = _query(
+            migrated_db, select(IngestionRun.status, IngestionRun.error_message)
+        )[0]
+        assert status == IngestionRunStatus.FAILED
+        assert "connection was closed" in error
+        assert "rolled back" not in error
+        assert row_by_row.call_count == 0
+        names = _query(migrated_db, text("SELECT name FROM committees"))
+        assert len(names) == 1200
         assert {name.split()[0] for (name,) in names} == {"old"}

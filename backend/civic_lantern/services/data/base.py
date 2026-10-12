@@ -74,7 +74,8 @@ class BaseService(Generic[T]):
         Each batch runs in a savepoint; a batch that fails is rolled back and
         retried row by row, so only its bad rows are skipped (and reported in
         `failed_ids`). Doesn't commit: the caller owns the transaction, so a
-        later failure can roll back every batch.
+        later failure can roll back every batch. An error that dropped the
+        connection is re-raised rather than retried.
         """
         stats: UpsertStats = {
             "inserted": 0,
@@ -102,6 +103,8 @@ class BaseService(Generic[T]):
                 )
 
             except exc.SQLAlchemyError as e:
+                if self._connection_invalidated(e):
+                    raise
                 logger.warning(
                     f"Batch failed for {self.model.__name__} (idx {i}). "
                     f"Switching to row-by-row. Error: {e}"
@@ -141,6 +144,8 @@ class BaseService(Generic[T]):
                 stats["updated"] += updated
 
             except Exception as e:
+                if self._connection_invalidated(e):
+                    raise
                 stats["errors"] += 1
                 stats["failed_ids"].append(row_id)
                 logger.error(
@@ -148,6 +153,11 @@ class BaseService(Generic[T]):
                 )
 
         return stats
+
+    @staticmethod
+    def _connection_invalidated(e: Exception) -> bool:
+        """Whether `e` dropped the connection, aborting the caller's transaction."""
+        return isinstance(e, exc.DBAPIError) and e.connection_invalidated
 
     def _row_key(self, row: dict) -> Any:
         """The row's primary key for error reports: a scalar for a single-column
