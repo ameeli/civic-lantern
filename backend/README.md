@@ -224,7 +224,9 @@ poetry run python -m civic_lantern.jobs.ingestion --entities inside_totals_by_ca
 
 GitHub Actions runs the nightly routine daily at 10:00 UTC
 (`.github/workflows/nightly-ingestion.yml`), and `manual-ingestion.yml` runs
-chosen entities on demand.
+chosen entities on demand. Both then revalidate the frontend's cached data,
+even after a failed run (see
+[`frontend/README.md`](../frontend/README.md#how-data-flows-in)).
 
 ## Testing
 

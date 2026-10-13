@@ -23,3 +23,10 @@ jobs:
       - run: poetry install --no-interaction --no-ansi --only main --no-root
       - name: Run nightly ingestion
         run: poetry run python -m civic_lantern.jobs.ingestion
+
+  # Runs even if ingestion failed: some entities may still have committed new data.
+  revalidate:
+    needs: ingest
+    if: always()
+    uses: ./.github/workflows/revalidate-frontend.yml
+    secrets: inherit

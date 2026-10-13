@@ -85,4 +85,21 @@ describe("fetchAllCandidatesForOffice", () => {
     const result = await fetchAllCandidatesForOffice(2024, "P");
     expect(result).toEqual([]);
   });
+
+  it("drops a candidate repeated across pages mixing cached and fresh data", async () => {
+    // A stale cached page 2 can repeat a candidate who moved off a fresh page 1.
+    server.use(
+      http.get("*/candidate-spending", ({ request }) => {
+        const offset = Number(new URL(request.url).searchParams.get("offset"));
+        const items =
+          offset === 0
+            ? [makeCandidate("A"), makeCandidate("B")]
+            : [makeCandidate("B"), makeCandidate("C")];
+        return HttpResponse.json({ items, total_count: 4, limit: 2, offset });
+      }),
+    );
+
+    const result = await fetchAllCandidatesForOffice(2024, "H");
+    expect(result.map((c) => c.candidate_id)).toEqual(["A", "B", "C"]);
+  });
 });

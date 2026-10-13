@@ -31,3 +31,10 @@ jobs:
           poetry run python -m civic_lantern.jobs.ingestion \
             --entities "${{ inputs.entities }}" \
             ${{ inputs.cycle && format('--cycle {0}', inputs.cycle) || '' }}
+
+  # Runs even if ingestion failed: some entities may still have committed new data.
+  revalidate:
+    needs: ingest
+    if: always()
+    uses: ./.github/workflows/revalidate-frontend.yml
+    secrets: inherit
