@@ -12,7 +12,7 @@ export const listElectionSpending = () => {
   return apiFetch<ElectionSpending[]>("/election-spending");
 };
 
-/** Cycles where every spending ingestor has succeeded, newest first. */
+/* Cycles where every spending ingestor has succeeded, newest first. */
 export const listReadyCycles = () => {
   return apiFetch<number[]>("/election-spending/cycles");
 };
@@ -37,9 +37,9 @@ export const listCandidatesSpending = (
   );
 };
 
-/**
- * Fetches every positive-spending candidate for one office, paginating until
- * complete. Pages are cached separately, so drop any candidate repeated across them.
+/*
+Fetches every positive-spending candidate for one office, paginating until complete. 
+Pages are cached separately, so drop any candidate repeated across them.
  */
 export const fetchAllCandidatesForOffice = async (
   cycle: number,

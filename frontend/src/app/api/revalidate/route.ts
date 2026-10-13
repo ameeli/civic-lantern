@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { revalidateTag } from "next/cache";
 import { FEC_DATA_TAG } from "@/api/cacheTags";
 
-/** Called by the ingestion workflows once new FEC data is in the database. */
+// Called by the ingestion workflows once new FEC data is in the database.
 export async function POST(request: Request) {
   const secret = process.env.REVALIDATE_SECRET;
   if (!secret) {
