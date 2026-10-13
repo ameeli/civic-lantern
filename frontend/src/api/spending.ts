@@ -37,13 +37,16 @@ export const listCandidatesSpending = (
   );
 };
 
-/** Fetches every positive-spending candidate for one office, paginating until complete. */
+/**
+ * Fetches every positive-spending candidate for one office, paginating until
+ * complete. Pages are cached separately, so drop any candidate repeated across them.
+ */
 export const fetchAllCandidatesForOffice = async (
   cycle: number,
   office: OfficeCode,
 ): Promise<CandidateSpending[]> => {
   const limit = 1000;
-  const all: CandidateSpending[] = [];
+  const byId = new Map<string, CandidateSpending>();
   let offset = 0;
 
   while (true) {
@@ -55,10 +58,12 @@ export const fetchAllCandidatesForOffice = async (
       limit,
       offset,
     });
-    all.push(...items);
+    for (const item of items) {
+      if (!byId.has(item.candidate_id)) byId.set(item.candidate_id, item);
+    }
     offset += items.length;
-    if (items.length === 0 || all.length >= total_count) break;
+    if (items.length === 0 || offset >= total_count) break;
   }
 
-  return all;
+  return [...byId.values()];
 };

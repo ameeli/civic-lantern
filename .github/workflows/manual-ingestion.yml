@@ -31,3 +31,14 @@ jobs:
           poetry run python -m civic_lantern.jobs.ingestion \
             --entities "${{ inputs.entities }}" \
             ${{ inputs.cycle && format('--cycle {0}', inputs.cycle) || '' }}
+      # Runs even if ingestion failed: some entities may still have committed new data.
+      - name: Revalidate the frontend's cached FEC data
+        if: always()
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: >-
+          curl --fail-with-body --silent --show-error
+          --retry 3 --retry-all-errors
+          -X POST -H "Authorization: Bearer $REVALIDATE_SECRET"
+          "$FRONTEND_URL/api/revalidate"

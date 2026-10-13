@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import CycleSelector from "@/components/CycleSelector";
 import Gavel from "@/components/Gavel";
 import MastheadRule from "@/components/MastheadRule";
@@ -24,13 +25,14 @@ function formatMastheadDate(date: Date) {
   return `${weekday}, ${month} ${day}${ordinalSuffix(day)}, ${year}`;
 }
 
-export default function Masthead({
+export default async function Masthead({
   cycles,
   selectedCycle,
 }: {
   cycles?: number[];
   selectedCycle?: number;
 }) {
+  await connection(); // today's date, not the prerender's
   const dateLine = formatMastheadDate(new Date());
   return (
     <div className="col-span-12 flex flex-col items-center lg:mt-0">
