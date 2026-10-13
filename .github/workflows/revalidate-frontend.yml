@@ -1,0 +1,24 @@
+name: Revalidate Frontend Cache
+
+# Called after each ingestion so the frontend refetches FEC data it has cached.
+on:
+  workflow_call:
+    secrets:
+      FRONTEND_URL:
+        required: true
+      REVALIDATE_SECRET:
+        required: true
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revalidate the frontend's cached FEC data
+        env:
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: >-
+          curl --fail-with-body --silent --show-error
+          --retry 3 --retry-all-errors
+          -X POST -H "Authorization: Bearer $REVALIDATE_SECRET"
+          "$FRONTEND_URL/api/revalidate"

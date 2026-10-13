@@ -23,14 +23,10 @@ jobs:
       - run: poetry install --no-interaction --no-ansi --only main --no-root
       - name: Run nightly ingestion
         run: poetry run python -m civic_lantern.jobs.ingestion
-      # Runs even if ingestion failed: some entities may still have committed new data.
-      - name: Revalidate the frontend's cached FEC data
-        if: always()
-        env:
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
-        run: >-
-          curl --fail-with-body --silent --show-error
-          --retry 3 --retry-all-errors
-          -X POST -H "Authorization: Bearer $REVALIDATE_SECRET"
-          "$FRONTEND_URL/api/revalidate"
+
+  # Runs even if ingestion failed: some entities may still have committed new data.
+  revalidate:
+    needs: ingest
+    if: always()
+    uses: ./.github/workflows/revalidate-frontend.yml
+    secrets: inherit

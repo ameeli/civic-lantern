@@ -93,9 +93,10 @@ production; plain `"use cache"` would be per-instance memory), keyed by URL
 and tagged `FEC_DATA_TAG`. The backend database is only queried when an entry
 is missing or stale:
 
-- After each nightly or manual ingestion, the GitHub workflow POSTs to
-  `/api/revalidate` with `Authorization: Bearer $REVALIDATE_SECRET`, which
-  calls `revalidateTag(FEC_DATA_TAG, "max")`. The next visit is served the
+- After each nightly or manual ingestion, the shared
+  `.github/workflows/revalidate-frontend.yml` job POSTs to `/api/revalidate`
+  with `Authorization: Bearer $REVALIDATE_SECRET`, which calls
+  `revalidateTag(FEC_DATA_TAG, "max")`. The next visit is served the
   stale copy while the entries it uses refresh in the background.
 - `cacheLife("days")` is the fallback if that call never arrives.
 - Production setup: `REVALIDATE_SECRET` in Vercel's environment variables;
