@@ -1,4 +1,3 @@
-import hashlib
 import hmac
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -41,18 +40,10 @@ def require_api_key(
             detail="API_KEYS is not configured",
         )
     presented = credentials.credentials if credentials else ""
-    if not any(_same_secret(presented, key) for key in keys):
+    # compare_digest is constant-time; it reveals at most the key's length.
+    if not any(hmac.compare_digest(presented.encode(), key.encode()) for key in keys):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-
-def _same_secret(a: str, b: str) -> bool:
-    # Hash first so the comparison is constant-time and leaks no length.
-    return hmac.compare_digest(_sha256(a), _sha256(b))
-
-
-def _sha256(value: str) -> bytes:
-    return hashlib.sha256(value.encode()).digest()
