@@ -1,13 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { formatDollars, formatDollarsFull } from "@/utils/formatDollars";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = process.env.API_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_KEY = process.env.BACKEND_API_KEY;
+if (!API_KEY) {
+  throw new Error("BACKEND_API_KEY is not set (see frontend/.env.local)");
+}
+const AUTH = { headers: { Authorization: `Bearer ${API_KEY}` } };
 const CYCLE = 2024;
 const OFFICE = "S";
 
 async function fetchSenateDefaultRange() {
   const res = await fetch(
     `${API_BASE}/candidate-spending?cycle=${CYCLE}&office=${OFFICE}&sort_by=total_spending&order=desc&limit=1000`,
+    AUTH,
   );
   const body = (await res.json()) as {
     items: { total_spending: number }[];
@@ -25,6 +31,7 @@ async function fetchSenateDefaultRange() {
 async function fetchTopSpend(office: string) {
   const res = await fetch(
     `${API_BASE}/candidate-spending?cycle=${CYCLE}&office=${office}&sort_by=total_spending&order=desc&limit=1`,
+    AUTH,
   );
   const body = (await res.json()) as { items: { total_spending: number }[] };
   return body.items[0].total_spending;

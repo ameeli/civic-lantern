@@ -72,7 +72,7 @@ e2e/
 
    ```bash
    API_URL=http://localhost:8000/api/v1
-   BACKEND_API_KEY=<any local value>
+   BACKEND_API_KEY=local-dev-key   # must be one of the backend's API_KEYS
    ```
 
 3. **Start the backend** (see [`../backend/README.md`](../backend/README.md)) so the API is reachable at the URL above.
@@ -146,9 +146,10 @@ npm run test:e2e
 ```
 
 Playwright starts `npm run dev` itself (or reuses a server already on
-`http://localhost:3000`). The backend must be reachable at
-`http://127.0.0.1:8000/api/v1` with 2024 data loaded, because the spec reads
-expected values from the live API. CI loads synthetic 2024 data with
+`http://localhost:3000`). The backend must be reachable at `API_URL`
+(default `http://127.0.0.1:8000/api/v1`) with 2024 data loaded, because the
+range-slider spec reads expected values from the live API, authenticating with
+`BACKEND_API_KEY`; `playwright.config.ts` loads both from `.env.local`. CI loads synthetic 2024 data with
 `backend/scripts/seed_e2e_data.py` (disposable databases only; see its
 docstring).
 

@@ -2,7 +2,7 @@
 
 **Illuminating dark money flows in American politics.**
 
-Civic Lantern is a campaign finance transparency platform that ingests data from the [Federal Election Commission (FEC) API](https://api.open.fec.gov/developers/) and exposes it through a clean REST API. It tracks both inside spending (official candidate disbursements) and outside spending (independent expenditures from Super PACs and dark money groups), making it easy to see who is funding — or targeting — a candidate.
+Civic Lantern is a campaign finance transparency platform that ingests data from the [Federal Election Commission (FEC) API](https://api.open.fec.gov/developers/) and serves it to a public dashboard through a private REST API. It tracks both inside spending (official candidate disbursements) and outside spending (independent expenditures from Super PACs and dark money groups), making it easy to see who is funding — or targeting — a candidate.
 
 ![The Civic Lantern dashboard, showing 2024 direct campaign spending vs. independent expenditures alongside a zoomable pack chart of spending by race](docs/screenshot.jpg)
 
@@ -10,7 +10,7 @@ Civic Lantern is a campaign finance transparency platform that ingests data from
 
 ## Why This Exists
 
-Campaign finance data is public, but the FEC's raw data is enormous, inconsistently structured, and hard to query. Civic Lantern pipelines that data into a structured PostgreSQL database and surfaces it through queryable endpoints. The goal is to make influence patterns visible — which candidates depend heavily on outside money, which face the most opposition spending, and how election cycles compare.
+Campaign finance data is public, but the FEC's raw data is enormous, inconsistently structured, and hard to query. Civic Lantern pipelines that data into a structured PostgreSQL database and surfaces it through the dashboard, backed by queryable endpoints. The goal is to make influence patterns visible — which candidates depend heavily on outside money, which face the most opposition spending, and how election cycles compare.
 
 ---
 
@@ -18,7 +18,7 @@ Campaign finance data is public, but the FEC's raw data is enormous, inconsisten
 
 ```
 civic-lantern/
-├── backend/        # FastAPI + PostgreSQL data pipeline and REST API
+├── backend/        # FastAPI + PostgreSQL data pipeline and private REST API
 └── frontend/       # Next.js UI — election spending dashboard
 ```
 
@@ -89,7 +89,9 @@ All models use a `TimestampMixin` backed by a server-side PostgreSQL trigger. `c
 
 ## API Overview
 
-Base path: `/api/v1`. All endpoints are read-only (`GET`).
+Base path: `/api/v1`. All endpoints are read-only (`GET`) and private: they
+require `Authorization: Bearer <key>`, which only the dashboard's Next.js
+server holds (see [`backend/README.md`](backend/README.md#api-authentication)).
 
 | Method | Endpoint | Description |
 |---|---|---|
