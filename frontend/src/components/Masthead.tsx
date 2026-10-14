@@ -1,29 +1,8 @@
-import { connection } from "next/server";
+import { headers } from "next/headers";
 import CycleSelector from "@/components/CycleSelector";
 import Gavel from "@/components/Gavel";
 import MastheadRule from "@/components/MastheadRule";
-
-function ordinalSuffix(day: number) {
-  if (day >= 11 && day <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
-
-function formatMastheadDate(date: Date) {
-  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
-  const month = date.toLocaleDateString("en-US", { month: "long" });
-  const day = date.getDate();
-  const year = date.getFullYear();
-  return `${weekday}, ${month} ${day}${ordinalSuffix(day)}, ${year}`;
-}
+import { formatMastheadDate } from "@/utils/formatMastheadDate";
 
 export default async function Masthead({
   cycles,
@@ -32,8 +11,9 @@ export default async function Masthead({
   cycles?: number[];
   selectedCycle?: number;
 }) {
-  await connection(); // today's date, not the prerender's
-  const dateLine = formatMastheadDate(new Date());
+  // Vercel sets this from the reader's IP, so the date is theirs, not the server's UTC.
+  const timeZone = (await headers()).get("x-vercel-ip-timezone");
+  const dateLine = formatMastheadDate(new Date(), timeZone);
   return (
     <div className="col-span-12 flex flex-col items-center lg:mt-0">
       <div className="relative w-full flex justify-center mb-6">
