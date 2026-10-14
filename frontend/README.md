@@ -38,17 +38,19 @@ src/
 │   ├── CandidateRangeSlider.tsx      # Dual-handle dollar-range slider for the zoomed-in office
 │   ├── CandidateRangeSlider.utils.ts # Pure range clamping and candidate-count binary search
 │   ├── ChartBreadcrumb.tsx           # Breadcrumb nav for the pack chart drill-down
-│   ├── Masthead.tsx                  # Newspaper-style page header with the current date
+│   ├── Masthead.tsx                  # Newspaper-style page header with the reader's current date
 │   ├── Gavel.tsx, MastheadRule.tsx, PaperBorder.tsx  # Decorative/layout components
 ├── hooks/
 │   └── useChartDimensions.ts  # ResizeObserver-based container sizing for the chart
 ├── utils/
 │   ├── formatDollars.ts         # Dollar formatting/parsing for chart labels, totals, and slider inputs
+│   ├── formatMastheadDate.ts    # Masthead date in the reader's time zone (Vercel's x-vercel-ip-timezone; America/New_York fallback)
 │   └── transformToHierarchy.ts  # Per-office candidate lists + active range -> office/candidate/spending-type hierarchy for d3.pack
 └── types/
     └── spending.ts  # TypeScript types mirroring the backend's Pydantic response schemas
 e2e/
-└── candidate-range-slider.spec.ts  # Playwright spec for the range slider (needs the backend running)
+├── candidate-range-slider.spec.ts  # Playwright spec for the range slider (needs the backend running)
+└── masthead-date.spec.ts           # Masthead shows the reader's date for their x-vercel-ip-timezone
 ```
 
 ## Local Setup
@@ -160,9 +162,10 @@ npx tsc --noEmit          # Type check
 
 - `next.config.ts` enables the React Compiler (`reactCompiler: true`) and
   Cache Components (`cacheComponents: true`), so request-time work (reading
-  `searchParams`, `new Date()`) sits inside `<Suspense>` or after
-  `connection()`. `partialPrefetching` is off: with it on, warm-cache pages
-  embedded a second ~1.5 MB copy of the chart's RSC payload.
+  `searchParams`, `new Date()`) sits inside `<Suspense>` or after a
+  request-time API such as `headers()` or `connection()`.
+  `partialPrefetching` is off: with it on, warm-cache pages embedded a second
+  ~1.5 MB copy of the chart's RSC payload.
 - `AGENTS.md`/`CLAUDE.md` flag that this project pins a Next.js version with
   breaking API/convention changes from what most training data assumes —
   check `node_modules/next/dist/docs/` before relying on prior Next.js
