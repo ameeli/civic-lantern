@@ -162,9 +162,10 @@ npx tsc --noEmit          # Type check
 
 - `next.config.ts` enables the React Compiler (`reactCompiler: true`) and
   Cache Components (`cacheComponents: true`), so request-time work (reading
-  `searchParams`, `new Date()`) sits inside `<Suspense>` or after
-  `connection()`. `partialPrefetching` is off: with it on, warm-cache pages
-  embedded a second ~1.5 MB copy of the chart's RSC payload.
+  `searchParams`, `new Date()`) sits inside `<Suspense>` or after a
+  request-time API such as `headers()` or `connection()`.
+  `partialPrefetching` is off: with it on, warm-cache pages embedded a second
+  ~1.5 MB copy of the chart's RSC payload.
 - `AGENTS.md`/`CLAUDE.md` flag that this project pins a Next.js version with
   breaking API/convention changes from what most training data assumes —
   check `node_modules/next/dist/docs/` before relying on prior Next.js
