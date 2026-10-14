@@ -2,7 +2,7 @@
 
 **Illuminating dark money flows in American politics.**
 
-Civic Lantern is a campaign finance transparency platform that ingests data from the [Federal Election Commission (FEC) API](https://api.open.fec.gov/developers/) and exposes it through a clean REST API. It tracks both inside spending (official candidate disbursements) and outside spending (independent expenditures from Super PACs and dark money groups), making it easy to see who is funding — or targeting — a candidate.
+Civic Lantern is a campaign finance transparency platform that ingests data from the [Federal Election Commission (FEC) API](https://api.open.fec.gov/developers/) and serves it to a public dashboard through a private REST API. It tracks both inside spending (official candidate disbursements) and outside spending (independent expenditures from Super PACs and dark money groups), making it easy to see who is funding — or targeting — a candidate.
 
 ![The Civic Lantern dashboard, showing 2024 direct campaign spending vs. independent expenditures alongside a zoomable pack chart of spending by race](docs/screenshot.jpg)
 
@@ -10,7 +10,7 @@ Civic Lantern is a campaign finance transparency platform that ingests data from
 
 ## Why This Exists
 
-Campaign finance data is public, but the FEC's raw data is enormous, inconsistently structured, and hard to query. Civic Lantern pipelines that data into a structured PostgreSQL database and surfaces it through queryable endpoints. The goal is to make influence patterns visible — which candidates depend heavily on outside money, which face the most opposition spending, and how election cycles compare.
+Campaign finance data is public, but the FEC's raw data is enormous, inconsistently structured, and hard to query. Civic Lantern pipelines that data into a structured PostgreSQL database and surfaces it through the dashboard, backed by queryable endpoints. The goal is to make influence patterns visible — which candidates depend heavily on outside money, which face the most opposition spending, and how election cycles compare.
 
 ---
 
@@ -18,7 +18,7 @@ Campaign finance data is public, but the FEC's raw data is enormous, inconsisten
 
 ```
 civic-lantern/
-├── backend/        # FastAPI + PostgreSQL data pipeline and REST API
+├── backend/        # FastAPI + PostgreSQL data pipeline and private REST API
 └── frontend/       # Next.js UI — election spending dashboard
 ```
 
@@ -89,7 +89,9 @@ All models use a `TimestampMixin` backed by a server-side PostgreSQL trigger. `c
 
 ## API Overview
 
-Base path: `/api/v1`. All endpoints are read-only (`GET`).
+Base path: `/api/v1`. All endpoints are read-only (`GET`) and private: they
+require `Authorization: Bearer <key>`, which only the dashboard's Next.js
+server holds (see [`backend/README.md`](backend/README.md#api-authentication)).
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -100,7 +102,7 @@ Base path: `/api/v1`. All endpoints are read-only (`GET`).
 | `GET` | `/election-spending` | All election-level spending summaries |
 | `GET` | `/election-spending/{cycle}` | Spending summary for a specific (even-year) election cycle |
 
-Interactive docs available at `/docs` (Swagger UI) when the server is running. Full request/response details are in [`backend/README.md`](backend/README.md#api).
+Interactive docs (`/docs`, Swagger UI) are off by default and available locally only with `EXPOSE_DOCS=true` (see [API authentication](backend/README.md#api-authentication)). Full request/response details are in [`backend/README.md`](backend/README.md#api).
 
 ---
 
@@ -121,7 +123,7 @@ git clone https://github.com/your-username/civic-lantern.git
 cd civic-lantern
 ```
 
-- **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (`/docs` for the interactive API explorer)
+- **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (set `EXPOSE_DOCS=true` for the interactive API explorer at `/docs`; see [API authentication](backend/README.md#api-authentication))
 - **Frontend:** see [`frontend/README.md`](frontend/README.md#local-setup) — runs at `http://localhost:3000`, and needs `API_URL` pointed at the backend above and `BACKEND_API_KEY` set
 
 ---

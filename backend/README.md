@@ -5,8 +5,9 @@
 The Civic Lantern is a campaign finance transparency platform that tracks
 outside spending (independent expenditures) alongside candidates' own
 fundraising, using data ingested from the FEC (Federal Election Commission)
-API. The backend is a FastAPI service backed by PostgreSQL, exposing
-read-only endpoints over candidate, committee, and campaign-spending data.
+API. The backend is a FastAPI service backed by PostgreSQL, exposing private
+read-only endpoints over candidate, committee, and campaign-spending data to
+the frontend's Next.js server.
 
 ## Tech Stack
 
@@ -84,8 +85,10 @@ tests/                # unit/ and integration/ suites
    poetry run uvicorn civic_lantern.main:app --reload
    ```
 
-   The API is served under `http://localhost:8000/api/v1`. Interactive docs
-   at `http://localhost:8000/docs`.
+   The API is served under `http://localhost:8000/api/v1` and needs a key
+   (see [API authentication](#api-authentication)). Set `EXPOSE_DOCS=true` in
+   `backend/.env` for interactive docs at `http://localhost:8000/docs`; use
+   **Authorize** there to send your key.
 
 ## Configuration
 
@@ -98,6 +101,9 @@ pydantic-settings model) and loaded from `backend/.env`. `get_settings()` is
 | `DATABASE_URL_ASYNC` | yes | Async (asyncpg) connection string used by the app |
 | `TEST_DATABASE_URL_ASYNC` | tests only | Async connection string for integration tests; never set it in deployed jobs |
 | `FEC_API_KEY` | no (needed for ingestion) | API key for api.open.fec.gov, sent as an `api_key` query param |
+| `API_KEYS` | yes, for the API | Comma-separated bearer keys `/api/v1` accepts; normally one, two only mid-rotation. Unset means every API request gets a 500 (fail closed) |
+| `EXPOSE_DOCS` | no (default `false`) | Serve `/docs`, `/redoc` and `/openapi.json`. Turn on only in a local `.env`, never in production |
+| `ALLOWED_ORIGINS` | no (default `http://localhost:3000`) | Comma-separated CORS origins |
 | `ENVIRONMENT` | no (default `development`) | Environment label |
 | `DEBUG` | no (default `True`) | Debug flag |
 
@@ -151,6 +157,23 @@ is excluded from `ON CONFLICT DO UPDATE` sets so it survives re-ingestion.
 ## API
 
 All endpoints are read-only (`GET`) and mounted under `/api/v1`.
+
+### API authentication
+
+The API is private: its only client is the frontend's Next.js server. Every
+`/api/v1` request needs `Authorization: Bearer <key>` matching one of
+`API_KEYS` (`require_api_key` in `api/deps.py`, compared in constant time);
+anything else gets a 401. `/health` stays open for the host's health checks,
+and the docs are off unless `EXPOSE_DOCS` is on.
+
+- **Production:** set `API_KEYS` on Render and the same value as
+  `BACKEND_API_KEY` in Vercel (see `frontend/README.md`).
+- **Local:** put one value in both `backend/.env` (`API_KEYS=local-dev-key`)
+  and `frontend/.env.local` (`BACKEND_API_KEY=local-dev-key`).
+- **Rotating a key** (after a suspected leak, or as routine): generate a new
+  one with `openssl rand -hex 32`, set Render's `API_KEYS=old,new`, set
+  Vercel's `BACKEND_API_KEY=new` and redeploy, then set `API_KEYS=new`. Never
+  reuse an old key.
 
 **`/api/v1/candidates`** (`api/routers/candidates.py`)
 

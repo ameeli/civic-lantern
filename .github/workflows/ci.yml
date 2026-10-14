@@ -115,6 +115,7 @@ jobs:
       FEC_API_KEY: unused-in-ci
       API_URL: http://127.0.0.1:8000/api/v1
       BACKEND_API_KEY: ci-backend-api-key
+      API_KEYS: ci-backend-api-key
     steps:
       - uses: actions/checkout@v7
 
@@ -140,7 +141,7 @@ jobs:
       - name: Wait for backend to be ready
         run: |
           for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8000/api/v1/election-spending/cycles && exit 0
+            curl -sf -H "Authorization: Bearer $BACKEND_API_KEY" http://127.0.0.1:8000/api/v1/election-spending/cycles && exit 0
             sleep 1
           done
           cat /tmp/backend.log
