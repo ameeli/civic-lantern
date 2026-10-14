@@ -122,7 +122,7 @@ cd civic-lantern
 ```
 
 - **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (`/docs` for the interactive API explorer)
-- **Frontend:** see [`frontend/README.md`](frontend/README.md#local-setup) — runs at `http://localhost:3000`, and needs `NEXT_PUBLIC_API_URL` pointed at the backend above
+- **Frontend:** see [`frontend/README.md`](frontend/README.md#local-setup) — runs at `http://localhost:3000`, and needs `API_URL` pointed at the backend above and `BACKEND_API_KEY` set
 
 ---
 

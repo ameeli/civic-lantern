@@ -11,7 +11,8 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     exclude: ["**/node_modules/**", "**/e2e/**"],
     env: {
-      NEXT_PUBLIC_API_URL: "http://localhost:3000/mock-api",
+      API_URL: "http://localhost:3000/mock-api",
+      BACKEND_API_KEY: "test-backend-key",
     },
   },
 });

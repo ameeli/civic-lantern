@@ -1,6 +1,9 @@
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { server } from "@/mocks/server";
 
+// The real package throws outside a React Server Components build.
+vi.mock("server-only", () => ({}));
+
 // next/cache only works inside the Next runtime; outside it, caching is a no-op.
 vi.mock("next/cache", () => ({
   cacheLife: vi.fn(),
