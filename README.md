@@ -102,7 +102,7 @@ server holds (see [`backend/README.md`](backend/README.md#api-authentication)).
 | `GET` | `/election-spending` | All election-level spending summaries |
 | `GET` | `/election-spending/{cycle}` | Spending summary for a specific (even-year) election cycle |
 
-Interactive docs available at `/docs` (Swagger UI) when the server is running. Full request/response details are in [`backend/README.md`](backend/README.md#api).
+Interactive docs (`/docs`, Swagger UI) are off by default and available locally only with `EXPOSE_DOCS=true` (see [API authentication](backend/README.md#api-authentication)). Full request/response details are in [`backend/README.md`](backend/README.md#api).
 
 ---
 
@@ -123,7 +123,7 @@ git clone https://github.com/your-username/civic-lantern.git
 cd civic-lantern
 ```
 
-- **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (`/docs` for the interactive API explorer)
+- **Backend:** see [`backend/README.md`](backend/README.md#local-setup) — runs at `http://localhost:8000` (set `EXPOSE_DOCS=true` for the interactive API explorer at `/docs`; see [API authentication](backend/README.md#api-authentication))
 - **Frontend:** see [`frontend/README.md`](frontend/README.md#local-setup) — runs at `http://localhost:3000`, and needs `API_URL` pointed at the backend above and `BACKEND_API_KEY` set
 
 ---
