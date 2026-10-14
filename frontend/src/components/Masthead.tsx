@@ -16,11 +16,14 @@ export default async function Masthead({
   const dateLine = formatMastheadDate(new Date(), timeZone);
   return (
     <div className="col-span-12 flex flex-col items-center lg:mt-0">
-      <div className="relative w-full flex justify-center mb-6">
+      <div className="@container relative w-full flex justify-center mb-6">
         <div className="hidden lg:flex absolute left-0 bottom-0 flex-col text-md font-medium leading-tight">
           <span>{dateLine}</span>
         </div>
-        <h1 className="text-masthead text-3xl">The Civic Lantern</h1>
+        {/* One line at any width: the title is ~10x its font size wide, capped at text-3xl. */}
+        <h1 className="text-masthead text-3xl text-[length:min(1.875rem,10cqw)] whitespace-nowrap">
+          The Civic Lantern
+        </h1>
         {cycles && selectedCycle !== undefined && (
           <div className="hidden lg:flex absolute right-0 bottom-0">
             <CycleSelector cycles={cycles} selectedCycle={selectedCycle} />
@@ -28,7 +31,7 @@ export default async function Masthead({
         )}
       </div>
       <div className="flex lg:hidden flex-col items-center text-md font-medium leading-tight">
-        <span>{dateLine}</span>
+        <span className="text-center text-balance">{dateLine}</span>
         {cycles && selectedCycle !== undefined && (
           <CycleSelector cycles={cycles} selectedCycle={selectedCycle} />
         )}

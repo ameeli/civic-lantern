@@ -50,7 +50,8 @@ src/
     └── spending.ts  # TypeScript types mirroring the backend's Pydantic response schemas
 e2e/
 ├── candidate-range-slider.spec.ts  # Playwright spec for the range slider (needs the backend running)
-└── masthead-date.spec.ts           # Masthead shows the reader's date for their x-vercel-ip-timezone
+├── masthead-date.spec.ts           # Masthead shows the reader's date for their x-vercel-ip-timezone
+└── masthead-title.spec.ts          # Playwright spec: masthead title stays on one line above the date at phone widths
 ```
 
 ## Local Setup
