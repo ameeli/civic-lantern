@@ -26,7 +26,7 @@ src/
 │   ├── page.tsx     # Home page — composes the dashboard sections
 │   └── api/revalidate/route.ts  # POST: marks cached backend data stale (called by ingestion)
 ├── api/
-│   ├── client.ts    # apiFetch() — cached GET against NEXT_PUBLIC_API_URL
+│   ├── client.ts    # apiFetch() — cached, authenticated GET against API_URL (server-only)
 │   ├── cacheTags.ts # FEC_DATA_TAG, shared by apiFetch and the revalidate route
 │   └── spending.ts  # Typed calls to /election-spending and /candidate-spending
 ├── components/
@@ -63,14 +63,16 @@ e2e/
    npm install
    ```
 
-2. **Configure the API URL**
+2. **Configure the backend URL and key**
 
-   The app reads `NEXT_PUBLIC_API_URL` (see `src/api/client.ts`) and prefixes
-   every request with it — there's no default, so it must be set. Create
-   `frontend/.env.local`:
+   `src/api/client.ts` prefixes every request with `API_URL` and sends
+   `BACKEND_API_KEY` as `Authorization: Bearer <key>`. Neither has a default,
+   and both are server-only (no `NEXT_PUBLIC_` prefix), so they never reach
+   the browser. Create `frontend/.env.local`:
 
    ```bash
-   NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+   API_URL=http://localhost:8000/api/v1
+   BACKEND_API_KEY=<any local value>
    ```
 
 3. **Start the backend** (see [`../backend/README.md`](../backend/README.md)) so the API is reachable at the URL above.

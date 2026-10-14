@@ -1,7 +1,13 @@
+import "server-only"; // fails the build if a Client Component imports this (and the key)
 import { cacheLife, cacheTag } from "next/cache";
 import { FEC_DATA_TAG } from "./cacheTags";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// Server-only settings: no NEXT_PUBLIC_ prefix, so Next never inlines them into browser code.
+function requiredEnv(name: "API_URL" | "BACKEND_API_KEY") {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
+}
 
 /*
 Responses are kept in the shared remote cache until the nightly ingestion revalidates 
@@ -12,8 +18,11 @@ export async function apiFetch<T>(endpoint: string): Promise<T> {
   cacheTag(FEC_DATA_TAG);
   cacheLife("days");
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: { "Content-Type": "application/json" },
+  const res = await fetch(`${requiredEnv("API_URL")}${endpoint}`, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${requiredEnv("BACKEND_API_KEY")}`,
+    },
   });
 
   if (!res.ok) {
