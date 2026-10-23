@@ -58,3 +58,8 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
 frontend/playwright/.cache/
+
+# --- CLAUDE CODE (local only) ---
+.claude/settings.local.json
+.claude/skills/
+skills-lock.json
